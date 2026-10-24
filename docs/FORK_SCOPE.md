@@ -96,10 +96,15 @@ No hosted posts, votes, comments or screenshots have been recovered or migrated.
 
 ## Completed local checks
 
+The table includes initial source-fix recovery evidence and subsequent dependency
+checks. See [dated validation](VALIDATION_2026-10-25.md) for revisions, independent
+reviewers, the final lockfile, patched-graph CI and explicitly historical image proof.
+
 | Check | Observed result |
 | --- | --- |
 | Vitest | 169 cases passed: API 66, core 54, widget 32, AI 14, database 3 |
 | Node configuration tests | Final 11-case run passed, including canonical alias redirects |
+| MCP HTTP / SMTP | Six real-SDK HTTP and four loopback SMTP cases passed; total suite now 190 cases |
 | TypeScript | All 20 workspace tasks passed; final dashboard also passed Next's type gate |
 | Build | All 15 workspace tasks passed; final dashboard rebuilt after runtime-policy/alias fixes |
 | Biome | Passed with six unchanged warnings in untouched theme/AI files |
@@ -115,3 +120,12 @@ These results concern synthetic local instances only. No production instance, ho
 feedback history, real TLS/DNS, SMTP/AI provider or external integration delivery was
 changed or exercised. Redis job recovery was not tested. GitHub CI is separate evidence
 for the exact published commit and must not be inferred from these local results.
+
+The complete patched dependency graph has zero critical/high findings and four
+documented moderate records, without suppressions. Independent security accepted
+their inactive development-server conditions; see `DEPENDENCY_SECURITY.md`. Do not
+start the legacy esbuild HTTP server, including on localhost, or expose mock/UI/HMR
+test servers. The final widget build passed actual browser QA after the scoped
+esbuild update, and fresh concurrent administrator bootstrap was repeated on the
+updated Better Auth version. No application source was changed to satisfy either
+proof.

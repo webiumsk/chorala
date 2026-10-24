@@ -1,4 +1,5 @@
-import { type AuthContext, apiKeys, unauthorized } from '@chorala/core'
+import { env } from '@chorala/config'
+import { type AuthContext, apiKeys, assertPermission, forbidden, unauthorized } from '@chorala/core'
 import { db, eq, members, projects } from '@chorala/db'
 import type { MiddlewareHandler } from 'hono'
 import { auth } from '../auth.ts'
@@ -30,6 +31,15 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   // --- Session cookie path ---
   const session = await auth.api.getSession({ headers: c.req.raw.headers })
   if (!session?.user) throw unauthorized()
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(c.req.method)) {
+    // CORS controls response access, not whether a cookie-authenticated write runs.
+    const trustedOrigins = [env.CHORALA_PUBLIC_URL, env.CHORALA_API_URL].map(
+      (url) => new URL(url).origin,
+    )
+    if (!trustedOrigins.includes(c.req.header('origin') ?? '')) {
+      throw forbidden('Invalid request origin')
+    }
+  }
 
   const orgHeader = c.req.header('x-chorala-org')
   const rows = await db.select().from(members).where(eq(members.userId, session.user.id))
@@ -43,5 +53,28 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
     memberId: membership.id,
     role: membership.role,
   } satisfies AuthContext)
+  return next()
+}
+
+/** Enforce transport permissions before any route can cause a side effect. */
+export const requirePermission: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const ctx = c.get('auth')
+  if (ctx.kind === 'apikey' && /^\/api\/v1\/org(?:\/|$)/.test(c.req.path)) {
+    throw forbidden('Project API keys cannot access organization-wide endpoints')
+  }
+  const safe = ['GET', 'HEAD', 'OPTIONS'].includes(c.req.method)
+  // These POST endpoints compute a read-only result; they do not persist a mutation.
+  const readQuery =
+    c.req.method === 'POST' &&
+    /^\/api\/v1\/projects\/[^/]+\/(?:ask|segments\/preview|changelog\/draft|posts\/[^/]+\/(?:summarize|draft-reply))$/.test(
+      c.req.path,
+    )
+  const ownNotifications =
+    c.req.method === 'POST' && c.req.path === '/api/v1/org/notifications/read'
+  const moderation = /^\/api\/v1\/projects\/[^/]+\/moderation(?:\/|$)/.test(c.req.path)
+  assertPermission(
+    ctx,
+    safe || ownNotifications || readQuery ? 'read' : moderation ? 'moderate' : 'write',
+  )
   return next()
 }

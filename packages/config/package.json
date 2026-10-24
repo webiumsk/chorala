@@ -13,7 +13,8 @@
   "scripts": {
     "build": "tsc --noEmit -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "biome check ."
+    "lint": "biome check .",
+    "test": "node --experimental-strip-types --experimental-test-isolation=none --test test/*.test.ts"
   },
   "dependencies": {
     "dotenv": "17.4.2",

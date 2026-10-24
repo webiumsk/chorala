@@ -1,14 +1,5 @@
+import { adminAliasRedirect, configuredAdminHosts, requestHostname } from '@chorala/config/hosts'
 import { type NextRequest, NextResponse } from 'next/server'
-
-/** Hosts that serve the admin app + /portal/[id]. Anything else is a project custom
- *  domain (e.g. feedback.musicaha.com) and is rewritten to the host-resolved portal. */
-const ADMIN_HOSTS = new Set([
-  'chorala.com',
-  'www.chorala.com',
-  'idea.2pu.net',
-  'localhost',
-  '127.0.0.1',
-])
 
 /** Standard API self-discovery, served on EVERY host (so a client that found any Chorala
  *  domain can discover the API): RFC 9727 api-catalog, a /.well-known/openapi.json alias,
@@ -16,8 +7,9 @@ const ADMIN_HOSTS = new Set([
 function discovery(req: NextRequest): NextResponse | null {
   const { pathname } = req.nextUrl
   // Public origin from the proxy's forwarded headers (req.nextUrl.origin is internal).
-  const proto = req.headers.get('x-forwarded-proto') ?? 'https'
-  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? req.nextUrl.host
+  const proto = req.headers.get('x-forwarded-proto') === 'http' ? 'http' : 'https'
+  // Route and discover using the actual Host, not a client-supplied forwarded host.
+  const host = req.headers.get('host') ?? req.nextUrl.host
   const origin = `${proto}://${host}`
   const spec = `${origin}/api/v1/openapi.json`
   const docs = `${origin}/docs`
@@ -73,11 +65,23 @@ function discovery(req: NextRequest): NextResponse | null {
 }
 
 export function middleware(req: NextRequest) {
+  const host = requestHostname(req.headers)
+  if (!host) return new NextResponse('Invalid host', { status: 400 })
   const disco = discovery(req)
   if (disco) return disco
 
-  const host = (req.headers.get('host') ?? '').toLowerCase().split(':')[0] ?? ''
-  if (ADMIN_HOSTS.has(host)) return NextResponse.next()
+  // Only configured hosts serve admin routes; every other host resolves a project portal.
+  if (configuredAdminHosts().has(host)) {
+    const canonical = adminAliasRedirect(
+      host,
+      req.nextUrl.pathname,
+      req.nextUrl.search,
+      process.env.CHORALA_PUBLIC_URL ?? 'http://localhost:3015',
+      process.env.CHORALA_ADMIN_HOSTS ?? '',
+    )
+    if (canonical) return NextResponse.redirect(canonical, 307)
+    return NextResponse.next()
+  }
 
   const url = req.nextUrl.clone()
   if (url.pathname.startsWith('/site')) return NextResponse.next()

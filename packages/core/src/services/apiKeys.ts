@@ -1,12 +1,13 @@
 import { apiKeys, db, eq, generateApiKey, hashApiKey, newId } from '@chorala/db'
 import type { CreateApiKeyInput } from '@chorala/types'
-import type { AuthContext } from '../context.ts'
-import { notFound } from '../errors.ts'
+import { type AuthContext, assertPermission, canManageOrg } from '../context.ts'
+import { badRequest, forbidden, notFound } from '../errors.ts'
 import { recordAudit } from './audit.ts'
 import { getProject } from './projects.ts'
 
 /** List a project's API keys — never returns the hash or the raw key. */
 export async function listApiKeys(ctx: AuthContext, projectId: string) {
+  assertPermission(ctx, 'read')
   await getProject(ctx, projectId)
   return db
     .select({
@@ -25,6 +26,10 @@ export async function listApiKeys(ctx: AuthContext, projectId: string) {
 
 /** Create a key; the raw `key` is returned exactly once and never stored. */
 export async function createApiKey(ctx: AuthContext, projectId: string, input: CreateApiKeyInput) {
+  if (!canManageOrg(ctx)) throw forbidden('Only org admins can create API keys')
+  if (input.scopes.some((scope) => scope !== 'read' && scope !== 'write')) {
+    throw badRequest('Unsupported API key scope')
+  }
   await getProject(ctx, projectId)
   const { key, prefix, hashedKey } = generateApiKey()
   const id = newId('apiKey')
@@ -45,6 +50,7 @@ export async function createApiKey(ctx: AuthContext, projectId: string, input: C
 }
 
 export async function revokeApiKey(ctx: AuthContext, projectId: string, id: string) {
+  if (!canManageOrg(ctx)) throw forbidden('Only org admins can revoke API keys')
   await getProject(ctx, projectId)
   const [row] = await db.select().from(apiKeys).where(eq(apiKeys.id, id))
   if (!row || row.projectId !== projectId) throw notFound('API key')

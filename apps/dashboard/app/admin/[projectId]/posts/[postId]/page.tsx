@@ -76,7 +76,7 @@ export default async function PostDetail({
     statusSvc.listStatuses(ctx, projectId),
     tagSvc.listTags(ctx, projectId),
     tagSvc.listPostTags(ctx, projectId, postId),
-    commentSvc.listComments(projectId, postId, { includeInternal: true }),
+    commentSvc.listAdminComments(ctx, projectId, postId),
     postSvc.listPosts(ctx, projectId, {}),
     postSvc.getDedupSuggestions(ctx, projectId, postId),
     integrations.listIntegrations(ctx, projectId),

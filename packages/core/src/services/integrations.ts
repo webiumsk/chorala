@@ -11,7 +11,7 @@ import {
   posts,
 } from '@chorala/db'
 import type { InboundEvent } from '@chorala/types'
-import type { AuthContext } from '../context.ts'
+import { type AuthContext, assertPermission } from '../context.ts'
 import { decryptSecret, encryptSecret } from '../crypto.ts'
 import { badRequest, notFound } from '../errors.ts'
 import { upsertFromIdentity as upsertCompany } from './companies.ts'
@@ -46,6 +46,7 @@ export async function setGithubIntegration(
   projectId: string,
   input: { repo: string; token?: string; autoCreate?: GithubAutoCreate },
 ) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   if (!/^[\w.-]+\/[\w.-]+$/.test(input.repo)) {
     throw badRequest('Repository must be in "owner/name" form')
@@ -72,6 +73,7 @@ export async function setGithubIntegration(
 }
 
 export async function removeGithubIntegration(ctx: AuthContext, projectId: string) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   await db
     .delete(integrations)
@@ -142,6 +144,7 @@ export async function createGithubIssue(
   projectId: string,
   postId: string,
 ): Promise<IssueLink> {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   const gh = await resolveGithub(projectId)
   if (!gh) throw badRequest('GitHub is not connected for this project')
@@ -217,6 +220,7 @@ export async function setDiscordIntegration(
   projectId: string,
   webhookUrl: string,
 ) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   if (!/^https:\/\/(discord\.com|discordapp\.com)\/api\/webhooks\//.test(webhookUrl)) {
     throw badRequest('Expected a https://discord.com/api/webhooks/… URL')
@@ -260,6 +264,7 @@ export async function notifyDiscord(projectId: string, content: string) {
 
 /** Enable the inbound webhook; returns the signing secret (shown once) + the URL to configure. */
 export async function setSegmentIntegration(ctx: AuthContext, projectId: string) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   const raw = generateSecret(24)
   const secret = encryptSecret(raw)
@@ -335,6 +340,7 @@ export async function removeIntegration(
   projectId: string,
   type: 'discord' | 'segment',
 ) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   await db
     .delete(integrations)

@@ -1,36 +1,65 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { env } from '@chorala/config'
 import { and, attachments, db, eq, inArray, isNull, newId, sql } from '@chorala/db'
 import type { CreateAttachmentInput } from '@chorala/types'
+import sharp from 'sharp'
 import type { AuthContext } from '../context.ts'
 import { badRequest, notFound } from '../errors.ts'
 import { getProject } from './projects.ts'
 
-const DATA_URL_RE = /^data:([^;,]+)(;base64)?,(.*)$/s
-const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+const DATA_URL_RE = /^data:([^;,]+);base64,(.*)$/s
+const FORMATS: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpeg',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+}
+const MAX_IMAGE_PIXELS = 16_777_216
 
 /** Decode a `data:<mime>;base64,<payload>` URL into a typed buffer; reject anything unexpected. */
-function decodeDataUrl(dataUrl: string): { mimeType: string; bytes: Buffer } {
+async function decodeDataUrl(dataUrl: string) {
+  // Check encoded length before regex capture, allocation or image decoding.
+  const maxEncoded = 4 * Math.ceil(env.CHORALA_ATTACHMENT_MAX_BYTES / 3)
+  if (dataUrl.length > maxEncoded + 128) throw badRequest('Attachment exceeds the size limit')
   const m = DATA_URL_RE.exec(dataUrl)
   if (!m) throw badRequest('Malformed data URL')
-  const [, rawMime, base64Flag, payload = ''] = m
+  const [, rawMime, payload = ''] = m
   const mimeType = (rawMime ?? '').toLowerCase()
-  if (!ALLOWED_MIME.has(mimeType)) throw badRequest(`Unsupported attachment type: ${mimeType}`)
-  const bytes = base64Flag
-    ? Buffer.from(payload, 'base64')
-    : Buffer.from(decodeURIComponent(payload), 'utf8')
-  if (bytes.byteLength === 0) throw badRequest('Empty attachment')
-  return { mimeType, bytes }
-}
-
-/** Best-effort intrinsic dimensions from the file header (PNG only; null otherwise). */
-function pngDimensions(bytes: Buffer): { width: number | null; height: number | null } {
-  // PNG signature + IHDR: width @ byte 16, height @ byte 20 (big-endian).
-  if (bytes.length >= 24 && bytes.toString('ascii', 1, 4) === 'PNG') {
-    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) }
+  if (!FORMATS[mimeType]) throw badRequest('Unsupported attachment type')
+  if (
+    !payload ||
+    payload.length > maxEncoded ||
+    payload.length % 4 !== 0 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(payload)
+  ) {
+    throw badRequest('Invalid or oversized attachment encoding')
   }
-  return { width: null, height: null }
+  const bytes = Buffer.from(payload, 'base64')
+  if (
+    !bytes.length ||
+    bytes.length > env.CHORALA_ATTACHMENT_MAX_BYTES ||
+    bytes.toString('base64') !== payload
+  ) {
+    throw badRequest('Invalid or oversized attachment')
+  }
+  try {
+    const image = sharp(bytes, { limitInputPixels: MAX_IMAGE_PIXELS, failOn: 'warning' })
+    const metadata = await image.metadata()
+    if (
+      metadata.format !== FORMATS[mimeType] ||
+      !metadata.width ||
+      !metadata.height ||
+      (metadata.pages ?? 1) > 1
+    ) {
+      throw new Error('Image type does not match')
+    }
+    // Decode all pixels, rather than trusting the MIME string or a magic header.
+    await image.stats()
+    return { mimeType, bytes, width: metadata.width, height: metadata.height }
+  } catch {
+    throw badRequest('Invalid image or image dimensions exceed the limit')
+  }
 }
 
 function uploadRoot() {
@@ -56,45 +85,55 @@ export async function createPublicAttachment(
   endUserId: string,
   input: CreateAttachmentInput,
 ) {
-  const { mimeType, bytes } = decodeDataUrl(input.dataUrl)
+  if (!/^[A-Za-z0-9_-]+$/.test(projectId)) throw badRequest('Invalid project')
+  const { mimeType, bytes, width, height } = await decodeDataUrl(input.dataUrl)
   const byteSize = bytes.byteLength
-  if (byteSize > env.CHORALA_ATTACHMENT_MAX_BYTES) {
-    throw badRequest(`Attachment exceeds the ${env.CHORALA_ATTACHMENT_MAX_BYTES}-byte limit`)
-  }
-  if ((await projectStorageUsage(projectId)) + byteSize > env.CHORALA_ATTACHMENT_QUOTA_BYTES) {
-    throw badRequest('Project attachment storage quota exceeded')
-  }
-
   const id = newId('attachment')
   const storageKey = join(projectId, id)
-  const dir = join(uploadRoot(), projectId)
-  await mkdir(dir, { recursive: true })
-  await writeFile(join(uploadRoot(), storageKey), bytes)
-
-  const { width, height } = pngDimensions(bytes)
-  const [row] = await db
-    .insert(attachments)
-    .values({
-      id,
-      projectId,
-      endUserId,
-      kind: input.kind,
-      mimeType,
-      byteSize,
-      width,
-      height,
-      storageKey,
+  const file = join(uploadRoot(), storageKey)
+  let written = false
+  try {
+    return await db.transaction(async (tx) => {
+      // Serialize reservations across all API replicas for this project.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${projectId}, 0))`)
+      const [usage] = await tx
+        .select({ total: sql<number>`coalesce(sum(${attachments.byteSize}), 0)::bigint` })
+        .from(attachments)
+        .where(eq(attachments.projectId, projectId))
+      if (Number(usage?.total ?? 0) + byteSize > env.CHORALA_ATTACHMENT_QUOTA_BYTES) {
+        throw badRequest('Project attachment storage quota exceeded')
+      }
+      await mkdir(join(uploadRoot(), projectId), { recursive: true })
+      await writeFile(file, bytes, { flag: 'wx', mode: 0o600 })
+      written = true
+      const [row] = await tx
+        .insert(attachments)
+        .values({
+          id,
+          projectId,
+          endUserId,
+          kind: input.kind,
+          mimeType,
+          byteSize,
+          width,
+          height,
+          storageKey,
+        })
+        .returning({
+          id: attachments.id,
+          kind: attachments.kind,
+          mimeType: attachments.mimeType,
+          byteSize: attachments.byteSize,
+          width: attachments.width,
+          height: attachments.height,
+        })
+      if (!row) throw badRequest('Failed to store attachment')
+      return row
     })
-    .returning({
-      id: attachments.id,
-      kind: attachments.kind,
-      mimeType: attachments.mimeType,
-      byteSize: attachments.byteSize,
-      width: attachments.width,
-      height: attachments.height,
-    })
-  if (!row) throw badRequest('Failed to store attachment')
-  return row
+  } catch (error) {
+    if (written) await unlink(file).catch(() => undefined)
+    throw error
+  }
 }
 
 /**

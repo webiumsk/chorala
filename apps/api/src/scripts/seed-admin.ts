@@ -1,39 +1,35 @@
-import { db, eq, members, SEED_ADMIN, users } from '@chorala/db'
-import type { MemberRole } from '@chorala/types'
-import { auth } from '../auth.ts'
+import { env } from '@chorala/config'
+import { client, db, sql, users } from '@chorala/db'
+import { createAuth } from '../auth.ts'
 
 /**
- * Turns the Phase-1 seeded admin into a real Better Auth credential.
- * The Phase-1 seed inserts the admin `user` + `member(owner)` rows but no password
- * (Better Auth's hasher isn't available there). Here we recreate the user via Better
- * Auth's sign-up API (so the credential is valid), preserving org memberships.
+ * Provision a fresh installation. Never reset, delete or replace existing accounts.
  */
 async function main() {
-  const [existing] = await db.select().from(users).where(eq(users.email, SEED_ADMIN.email))
-
-  let memberships: { orgId: string; role: MemberRole }[] = []
-  if (existing) {
-    const rows = await db.select().from(members).where(eq(members.userId, existing.id))
-    memberships = rows.map((m) => ({ orgId: m.orgId, role: m.role }))
-    // Cascades the member rows; we recreate them against the new auth user below.
-    await db.delete(users).where(eq(users.id, existing.id))
-  }
-
-  const result = await auth.api.signUpEmail({
-    body: { email: SEED_ADMIN.email, password: SEED_ADMIN.password, name: SEED_ADMIN.name },
+  const email = env.CHORALA_BOOTSTRAP_EMAIL
+  const password = env.CHORALA_BOOTSTRAP_PASSWORD
+  const name = env.CHORALA_BOOTSTRAP_NAME || 'Administrator'
+  if (!email || !password) throw new Error('Configure the initial administrator credentials')
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('chorala-bootstrap', 0))`)
+    const existing = await tx.select({ id: users.id }).from(users).limit(1)
+    if (existing.length)
+      throw new Error('Accounts already exist; use invitations or password recovery')
+    await createAuth({ allowRegistration: true }).api.signUpEmail({
+      body: { email, password, name },
+    })
   })
-  const newUserId = result.user.id
-
-  for (const m of memberships) {
-    await db.insert(members).values({ orgId: m.orgId, userId: newUserId, role: m.role })
-  }
-
-  console.log(`✓ admin credential ready: ${SEED_ADMIN.email} / ${SEED_ADMIN.password}`)
-  console.log(`  user: ${newUserId}, memberships restored: ${memberships.length}`)
-  process.exit(0)
+  console.log('Initial administrator created. Remove the bootstrap password from the environment.')
 }
 
-main().catch((err) => {
-  console.error('✗ seed-admin failed:', err)
-  process.exit(1)
-})
+main()
+  .catch(() => {
+    // Provider errors can contain request data. Do not print credentials or raw errors.
+    console.error(
+      'Administrator bootstrap refused or failed. Check configuration and use a fresh installation; existing accounts were not reset.',
+    )
+    process.exitCode = 1
+  })
+  .finally(async () => {
+    await client.end()
+  })

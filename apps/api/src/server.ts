@@ -2,7 +2,8 @@ import { env } from '@chorala/config'
 import { serve } from '@hono/node-server'
 import { createApp } from './app.ts'
 
-const port = Number(new URL(env.CHORALA_API_URL).port || '8787')
+// Public URL ports belong to the edge proxy; the application listens internally.
+const port = env.CHORALA_API_PORT
 
 serve({ fetch: createApp().fetch, port }, (info) => {
   console.log(

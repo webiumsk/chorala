@@ -2,6 +2,7 @@ import { and, comments, db, desc, endUsers, eq, isNotNull, or, posts, sql } from
 import { type AuthContext, canModerate } from '../context.ts'
 import { badRequest, forbidden, notFound } from '../errors.ts'
 import { recordAudit } from './audit.ts'
+import { getProject } from './projects.ts'
 
 /**
  * Lightweight, deterministic spam heuristic (no AI required). Returns a short reason string
@@ -46,6 +47,7 @@ export function detectSpam(text: string): string | null {
 /** The flagged-or-hidden posts + comments awaiting a moderator's decision. */
 export async function listModerationQueue(ctx: AuthContext, projectId: string) {
   if (!canModerate(ctx)) throw forbidden('You do not have moderation access')
+  await getProject(ctx, projectId)
 
   const flaggedPosts = await db
     .select({
@@ -132,6 +134,7 @@ export async function moderatePost(
   action: ModerationAction,
 ) {
   if (!canModerate(ctx)) throw forbidden('You do not have moderation access')
+  await getProject(ctx, projectId)
   await assertPostInProject(projectId, id)
   const patch = patchFor(action)
   await db.update(posts).set(patch).where(eq(posts.id, id))
@@ -147,6 +150,7 @@ export async function moderateComment(
   action: ModerationAction,
 ) {
   if (!canModerate(ctx)) throw forbidden('You do not have moderation access')
+  await getProject(ctx, projectId)
   const postId = await assertCommentInProject(projectId, id)
   const patch = patchFor(action)
   await db.update(comments).set(patch).where(eq(comments.id, id))

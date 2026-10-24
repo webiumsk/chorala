@@ -1,6 +1,6 @@
 import { and, companies, db, eq, newId, sql } from '@chorala/db'
 import type { UpdateCompanyInput } from '@chorala/types'
-import type { AuthContext } from '../context.ts'
+import { type AuthContext, assertPermission } from '../context.ts'
 import { badRequest, notFound } from '../errors.ts'
 import { getProject } from './projects.ts'
 
@@ -103,6 +103,7 @@ export async function updateCompany(
   id: string,
   input: UpdateCompanyInput,
 ) {
+  assertPermission(ctx, 'write')
   await getCompany(ctx, projectId, id)
   if (
     input.name === undefined &&

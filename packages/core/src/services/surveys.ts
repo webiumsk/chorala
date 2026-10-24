@@ -6,10 +6,10 @@ import type {
   UpdateSurveyInput,
 } from '@chorala/types'
 import { segmentDefinition } from '@chorala/types'
-import type { AuthContext } from '../context.ts'
+import { type AuthContext, assertPermission } from '../context.ts'
 import { badRequest, notFound } from '../errors.ts'
 import { getProject } from './projects.ts'
-import { isInSegment } from './segments.ts'
+import { getSegment, isInSegment } from './segments.ts'
 
 export async function listSurveys(ctx: AuthContext, projectId: string) {
   await getProject(ctx, projectId)
@@ -31,7 +31,9 @@ export async function getSurvey(ctx: AuthContext, projectId: string, id: string)
 }
 
 export async function createSurvey(ctx: AuthContext, projectId: string, input: CreateSurveyInput) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
+  if (input.segmentId) await getSegment(ctx, projectId, input.segmentId)
   const [row] = await db
     .insert(surveys)
     .values({
@@ -55,7 +57,9 @@ export async function updateSurvey(
   id: string,
   input: UpdateSurveyInput,
 ) {
+  assertPermission(ctx, 'write')
   await getSurvey(ctx, projectId, id)
+  if (input.segmentId) await getSegment(ctx, projectId, input.segmentId)
   const [row] = await db
     .update(surveys)
     .set({
@@ -72,6 +76,7 @@ export async function updateSurvey(
 }
 
 export async function deleteSurvey(ctx: AuthContext, projectId: string, id: string) {
+  assertPermission(ctx, 'write')
   await getSurvey(ctx, projectId, id)
   await db.delete(surveys).where(eq(surveys.id, id))
   return { id, deleted: true }

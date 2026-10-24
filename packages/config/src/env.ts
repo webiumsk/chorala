@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { dirname, isAbsolute, resolve } from 'node:path'
 import { config as loadDotenv } from 'dotenv'
 import { z } from 'zod'
+import { resolveAdminHosts } from './hosts.ts'
 
 /** Walk up from `start` to find the monorepo root (the dir holding pnpm-workspace.yaml). */
 function findRepoRoot(start: string): string | null {
@@ -27,18 +28,46 @@ export const envSchema = z
   .object({
     // --- Deployment ---
     CHORALA_DEPLOYMENT: z.enum(['selfhost', 'cloud']).default('selfhost'),
-    CHORALA_PUBLIC_URL: z.url().default('http://localhost:3000'),
+    CHORALA_PUBLIC_URL: z.url().default('http://localhost:3015'),
+    CHORALA_ADMIN_HOSTS: z.string().default(''),
     CHORALA_API_URL: z.url().default('http://localhost:8787'),
+    CHORALA_API_PORT: z.coerce.number().int().min(1).max(65535).default(8787),
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 
     // --- Database (required) ---
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+    CHORALA_DB_PASSWORD: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z
+        .string()
+        .regex(
+          /^[A-Za-z0-9_-]{32,}$/,
+          'Use a random URL-safe database password of at least 32 characters',
+        )
+        .optional(),
+    ),
 
     // --- Redis ---
     REDIS_URL: z.string().min(1).default('redis://localhost:6379'),
 
     // --- Auth ---
     CHORALA_AUTH_SECRET: z.string().min(32, 'CHORALA_AUTH_SECRET must be at least 32 characters'),
+    CHORALA_ALLOW_SIGNUP: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
+    CHORALA_BOOTSTRAP_EMAIL: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.email().optional(),
+    ),
+    CHORALA_BOOTSTRAP_PASSWORD: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().min(16).max(128).optional(),
+    ),
+    CHORALA_BOOTSTRAP_NAME: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().min(1).max(200).optional(),
+    ),
     GITHUB_CLIENT_ID: z.string().optional(),
     GITHUB_CLIENT_SECRET: z.string().optional(),
     GOOGLE_CLIENT_ID: z.string().optional(),
@@ -73,12 +102,29 @@ export const envSchema = z
 
     // --- Attachments (bug-report screenshots) ---
     // Absolute, shared path: API writes, dashboard reads. Must be reachable by both apps.
-    CHORALA_UPLOAD_DIR: z.string().default('/tmp/chorala-uploads'),
+    CHORALA_UPLOAD_DIR: z
+      .string()
+      .refine(isAbsolute, 'CHORALA_UPLOAD_DIR must be an absolute path')
+      .default('/tmp/chorala-uploads'),
     // Per-file ceiling (5 MB) and per-project storage quota (1 GB) — metered, not inlined.
-    CHORALA_ATTACHMENT_MAX_BYTES: z.coerce.number().int().positive().default(5_000_000),
+    CHORALA_ATTACHMENT_MAX_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(10 * 1024 * 1024)
+      .default(5_000_000),
     CHORALA_ATTACHMENT_QUOTA_BYTES: z.coerce.number().int().positive().default(1_000_000_000),
   })
   .superRefine((val, ctx) => {
+    try {
+      resolveAdminHosts(val.CHORALA_PUBLIC_URL, val.CHORALA_ADMIN_HOSTS)
+    } catch (error) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['CHORALA_ADMIN_HOSTS'],
+        message: error instanceof Error ? error.message : 'Invalid admin host configuration',
+      })
+    }
     if (
       (val.CHORALA_AI_PROVIDER === 'openai' || val.CHORALA_AI_PROVIDER === 'anthropic') &&
       !val.CHORALA_AI_API_KEY

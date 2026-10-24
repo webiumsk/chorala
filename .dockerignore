@@ -7,5 +7,11 @@
 **/test-results
 **/.playwright-mcp
 .git
+# Operator configuration and backup files must never enter image build contexts.
+**/.env
+**/.env.*
+!**/.env.example
+**/backups
+**/*.dump
 *.log
 *.png

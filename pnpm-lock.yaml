@@ -105,6 +105,9 @@ importers:
       react-dom:
         specifier: 19.2.7
         version: 19.2.7(react@19.2.7)
+      sharp:
+        specifier: 0.34.5
+        version: 0.34.5
       tailwind-merge:
         specifier: 3.6.0
         version: 3.6.0
@@ -251,6 +254,9 @@ importers:
       ioredis:
         specifier: 5.11.1
         version: 5.11.1
+      sharp:
+        specifier: 0.34.5
+        version: 0.34.5
     devDependencies:
       '@types/node':
         specifier: 22.18.9
@@ -3479,8 +3485,7 @@ snapshots:
     dependencies:
       hono: 4.12.25
 
-  '@img/colour@1.1.0':
-    optional: true
+  '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.34.5':
     optionalDependencies:
@@ -4821,8 +4826,7 @@ snapshots:
 
   semver@7.8.1: {}
 
-  semver@7.8.4:
-    optional: true
+  semver@7.8.4: {}
 
   send@1.2.1:
     dependencies:
@@ -4883,7 +4887,6 @@ snapshots:
       '@img/sharp-win32-arm64': 0.34.5
       '@img/sharp-win32-ia32': 0.34.5
       '@img/sharp-win32-x64': 0.34.5
-    optional: true
 
   shebang-command@2.0.0:
     dependencies:

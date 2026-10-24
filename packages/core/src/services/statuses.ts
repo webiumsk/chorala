@@ -1,6 +1,6 @@
 import { asc, db, eq, newId, statuses } from '@chorala/db'
 import type { CreateStatusInput, UpdateStatusInput } from '@chorala/types'
-import type { AuthContext } from '../context.ts'
+import { type AuthContext, assertPermission } from '../context.ts'
 import { notFound } from '../errors.ts'
 import { getProject } from './projects.ts'
 
@@ -21,6 +21,7 @@ async function getStatusRow(ctx: AuthContext, projectId: string, id: string) {
 }
 
 export async function createStatus(ctx: AuthContext, projectId: string, input: CreateStatusInput) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   const existing = await db.select().from(statuses).where(eq(statuses.projectId, projectId))
   const position = input.position ?? existing.length
@@ -45,6 +46,7 @@ export async function updateStatus(
   id: string,
   input: UpdateStatusInput,
 ) {
+  assertPermission(ctx, 'write')
   await getStatusRow(ctx, projectId, id)
   const [row] = await db
     .update(statuses)
@@ -61,6 +63,7 @@ export async function updateStatus(
 }
 
 export async function deleteStatus(ctx: AuthContext, projectId: string, id: string) {
+  assertPermission(ctx, 'write')
   await getStatusRow(ctx, projectId, id)
   await db.delete(statuses).where(eq(statuses.id, id))
   return { id, deleted: true }

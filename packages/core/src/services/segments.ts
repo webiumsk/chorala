@@ -1,7 +1,7 @@
 import { and, asc, db, eq, newId, segments, sql } from '@chorala/db'
 import type { CreateSegmentInput, SegmentDefinition, UpdateSegmentInput } from '@chorala/types'
 import { segmentDefinition } from '@chorala/types'
-import type { AuthContext } from '../context.ts'
+import { type AuthContext, assertPermission } from '../context.ts'
 import { badRequest, notFound } from '../errors.ts'
 import { getProject } from './projects.ts'
 
@@ -141,6 +141,7 @@ export async function createSegment(
   projectId: string,
   input: CreateSegmentInput,
 ) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   const [row] = await db
     .insert(segments)
@@ -161,6 +162,7 @@ export async function updateSegment(
   id: string,
   input: UpdateSegmentInput,
 ) {
+  assertPermission(ctx, 'write')
   await getSegment(ctx, projectId, id)
   const [row] = await db
     .update(segments)
@@ -171,6 +173,7 @@ export async function updateSegment(
 }
 
 export async function deleteSegment(ctx: AuthContext, projectId: string, id: string) {
+  assertPermission(ctx, 'write')
   await getSegment(ctx, projectId, id)
   await db.delete(segments).where(eq(segments.id, id))
   return { id, deleted: true }

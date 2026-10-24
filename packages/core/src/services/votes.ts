@@ -1,9 +1,41 @@
 import { and, db, endUsers, eq, isNull, newId, or, posts, sql, votes } from '@chorala/db'
 import type { VoteForInput } from '@chorala/types'
-import type { AuthContext } from '../context.ts'
+import { type AuthContext, assertPermission } from '../context.ts'
 import { badRequest, notFound } from '../errors.ts'
 import { enqueueWebhookEvent } from '../queues.ts'
 import { getProject } from './projects.ts'
+import { assertPublicPost } from './publicVisibility.ts'
+
+async function voteTarget(
+  projectId: string,
+  postId: string,
+  endUserId: string,
+  publicOnly: boolean,
+) {
+  const [endUser] = await db
+    .select({ id: endUsers.id })
+    .from(endUsers)
+    .where(and(eq(endUsers.id, endUserId), eq(endUsers.projectId, projectId)))
+  if (!endUser) throw notFound('End user')
+
+  const [post] = await db
+    .select({ id: posts.id, projectId: posts.projectId, mergedIntoPostId: posts.mergedIntoPostId })
+    .from(posts)
+    .where(and(eq(posts.id, postId), eq(posts.projectId, projectId)))
+  if (!post) throw notFound('Post')
+  const canonicalId = post.mergedIntoPostId ?? post.id
+  if (publicOnly) {
+    await assertPublicPost(projectId, postId)
+    if (canonicalId !== postId) await assertPublicPost(projectId, canonicalId)
+  } else if (canonicalId !== postId) {
+    const [canonical] = await db
+      .select({ id: posts.id })
+      .from(posts)
+      .where(and(eq(posts.id, canonicalId), eq(posts.projectId, projectId)))
+    if (!canonical) throw notFound('Post')
+  }
+  return canonicalId
+}
 
 /**
  * Toggle an end-user's vote on a post. Votes always attach to the **canonical** post
@@ -11,13 +43,7 @@ import { getProject } from './projects.ts'
  * and duplicate ideas accumulate votes together (SPEC §11).
  */
 export async function toggleVote(projectId: string, postId: string, endUserId: string) {
-  const [post] = await db
-    .select({ id: posts.id, projectId: posts.projectId, mergedIntoPostId: posts.mergedIntoPostId })
-    .from(posts)
-    .where(eq(posts.id, postId))
-  if (!post || post.projectId !== projectId) throw notFound('Post')
-
-  const canonicalId = post.mergedIntoPostId ?? post.id
+  const canonicalId = await voteTarget(projectId, postId, endUserId, true)
 
   const [existing] = await db
     .select({ id: votes.id })
@@ -51,13 +77,9 @@ export async function setVote(
   postId: string,
   endUserId: string,
   shouldVote: boolean,
+  publicOnly = true,
 ) {
-  const [post] = await db
-    .select({ id: posts.id, projectId: posts.projectId, mergedIntoPostId: posts.mergedIntoPostId })
-    .from(posts)
-    .where(eq(posts.id, postId))
-  if (!post || post.projectId !== projectId) throw notFound('Post')
-  const canonicalId = post.mergedIntoPostId ?? post.id
+  const canonicalId = await voteTarget(projectId, postId, endUserId, publicOnly)
 
   const [existing] = await db
     .select({ id: votes.id })
@@ -93,6 +115,7 @@ export async function voteForUser(
   postId: string,
   input: VoteForInput,
 ) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   if (!input.email && !input.externalId) throw badRequest('Provide an email or externalId')
 
@@ -122,7 +145,7 @@ export async function voteForUser(
     endUserId = created.id
   }
 
-  return setVote(projectId, postId, endUserId, true)
+  return setVote(projectId, postId, endUserId, true, false)
 }
 
 export async function hasVoted(postId: string, endUserId: string) {

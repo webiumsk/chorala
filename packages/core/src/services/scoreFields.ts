@@ -1,6 +1,6 @@
 import { and, asc, db, eq, newId, scoreFields } from '@chorala/db'
 import type { CreateScoreFieldInput, UpdateScoreFieldInput } from '@chorala/types'
-import type { AuthContext } from '../context.ts'
+import { type AuthContext, assertPermission } from '../context.ts'
 import { badRequest, conflict, notFound } from '../errors.ts'
 import { getProject } from './projects.ts'
 
@@ -27,6 +27,7 @@ export async function createScoreField(
   projectId: string,
   input: CreateScoreFieldInput,
 ) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   const [dupe] = await db
     .select({ id: scoreFields.id })
@@ -54,6 +55,7 @@ export async function updateScoreField(
   id: string,
   input: UpdateScoreFieldInput,
 ) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   const [row] = await db
     .update(scoreFields)
@@ -70,6 +72,7 @@ export async function updateScoreField(
 }
 
 export async function deleteScoreField(ctx: AuthContext, projectId: string, id: string) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   const [row] = await db
     .delete(scoreFields)

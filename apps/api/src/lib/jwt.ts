@@ -7,6 +7,19 @@ import { jwtVerify } from 'jose'
  */
 export async function verifyEndUserJwt(token: string, secret: string): Promise<EndUserJwtPayload> {
   const key = new TextEncoder().encode(secret)
-  const { payload } = await jwtVerify(token, key, { algorithms: ['HS256'] })
+  const { payload } = await jwtVerify(token, key, {
+    algorithms: ['HS256'],
+    requiredClaims: ['iat', 'exp'],
+    maxTokenAge: '24h',
+    clockTolerance: 5,
+  })
+  if (
+    typeof payload.iat !== 'number' ||
+    typeof payload.exp !== 'number' ||
+    payload.exp <= payload.iat ||
+    payload.exp - payload.iat > 86_400
+  ) {
+    throw new Error('End-user token must have a lifetime of at most 24 hours')
+  }
   return endUserJwtPayload.parse(payload)
 }

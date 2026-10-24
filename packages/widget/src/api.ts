@@ -19,11 +19,12 @@ export type Api = ReturnType<typeof createApi>
 
 export function createApi(cfg: ApiConfig) {
   const base = cfg.apiBase.replace(/\/+$/, '')
+  let jwt = cfg.jwt
 
   function headers(json = false): Record<string, string> {
     const h: Record<string, string> = { 'x-chorala-key': cfg.projectKey }
     if (json) h['content-type'] = 'application/json'
-    if (cfg.jwt) h['x-chorala-user'] = cfg.jwt
+    if (jwt) h['x-chorala-user'] = jwt
     return h
   }
 
@@ -50,6 +51,10 @@ export function createApi(cfg: ApiConfig) {
   }
 
   return {
+    /** Rotate the current identity header without replacing a mounted widget. */
+    setJwt: (nextJwt?: string) => {
+      jwt = nextJwt
+    },
     listBoards: (locale?: string, boardSlug?: string, sort?: string) =>
       req<BoardsResponse>(`/public/boards${qs({ locale, boardSlug, sort })}`, {
         headers: headers(),

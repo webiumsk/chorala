@@ -1,6 +1,6 @@
 import { and, asc, boards, db, eq, newId } from '@chorala/db'
 import type { CreateBoardInput, UpdateBoardInput } from '@chorala/types'
-import type { AuthContext } from '../context.ts'
+import { type AuthContext, assertPermission } from '../context.ts'
 import { conflict, notFound } from '../errors.ts'
 import { getProject } from './projects.ts'
 
@@ -24,6 +24,7 @@ export async function getBoard(ctx: AuthContext, projectId: string, id: string) 
 }
 
 export async function createBoard(ctx: AuthContext, projectId: string, input: CreateBoardInput) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   const [dupe] = await db
     .select({ id: boards.id })
@@ -52,6 +53,7 @@ export async function updateBoard(
   id: string,
   input: UpdateBoardInput,
 ) {
+  assertPermission(ctx, 'write')
   await getBoard(ctx, projectId, id)
   const [row] = await db
     .update(boards)
@@ -68,6 +70,7 @@ export async function updateBoard(
 }
 
 export async function deleteBoard(ctx: AuthContext, projectId: string, id: string) {
+  assertPermission(ctx, 'write')
   await getBoard(ctx, projectId, id)
   await db.delete(boards).where(eq(boards.id, id))
   return { id, deleted: true }

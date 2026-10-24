@@ -24,7 +24,7 @@
   "dependencies": {
     "@chorala/config": "workspace:*",
     "drizzle-orm": "0.45.2",
-    "nanoid": "5.1.11",
+    "nanoid": "5.1.16",
     "postgres": "3.4.9"
   },
   "devDependencies": {
@@ -32,6 +32,6 @@
     "drizzle-kit": "0.31.10",
     "tsx": "4.22.4",
     "typescript": "5.9.3",
-    "vitest": "3.2.6"
+    "vitest": "3.2.7"
   }
 }

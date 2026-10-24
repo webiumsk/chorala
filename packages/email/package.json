@@ -13,14 +13,14 @@
   "scripts": {
     "build": "tsc --noEmit -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "biome check ."
+    "lint": "biome check .",
+    "test": "node --experimental-strip-types --experimental-test-isolation=none --test test/*.test.ts"
   },
   "dependencies": {
     "@chorala/config": "workspace:*",
-    "nodemailer": "8.0.11"
+    "nodemailer": "10.1.7"
   },
   "devDependencies": {
-    "@types/nodemailer": "8.0.1",
     "typescript": "5.9.3"
   }
 }

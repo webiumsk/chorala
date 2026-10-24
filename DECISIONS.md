@@ -415,3 +415,38 @@ choice. Format: `- [phase] chose X over Y because Z`.
   worker startup) that emails org owners/admins — but only when the email transport is configured;
   with transport=none it logs. The digest BUILDER is verified via GET /digest/preview + tests; the
   cron firing itself isn't unit-tested (BullMQ scheduling is infra, not our logic).
+
+## 2026-10-25: owned Satflux fork dependency maintenance
+
+Keep SPEC's Next 15 and Vitest 3 major lines while applying compatible security
+patches. Next 15.5.28, Better Auth 1.6.33, Sharp 0.35.5, Zod 4.6.7 and MCP SDK
+1.32.2 replace the inherited vulnerable versions. Nodemailer moves to 10.1.7
+because its recipient-parser fixes require the newer line; the existing unpooled
+SMTP API is retained and tested with synthetic loopback submission, authentication
+and rejection. No-op email diagnostics contain no message or recipient data.
+
+Pinned pnpm overrides patch runtime transitives within their existing majors.
+Vitest 3.2.7 uses Tinypool 2.1.2: Tinypool's major change removes Node 18 support,
+while this fork uses Node 24. Validate both fork and thread pools. Do not force
+Vitest 4's mocker into Vitest 3 or silently amend SPEC to hide an audit finding.
+All transitive PostCSS copies are explicitly pinned to the patched 8.5 line.
+Build tools also receive patched js-yaml 4 and brace-expansion 2. The scoped
+`esbuild@^0.27.0` override moves tsup to 0.28.1, whose pre-1.0 breaking change is
+fallback binary-download integrity verification. Rebuild and browser-test the
+widget; preserve Drizzle's unrelated legacy esbuild instead of forcing a global
+cross-version override.
+
+MCP HTTP requires independent caller authentication before SDK creation/parsing,
+defaults to loopback and uses per-request stateless transports. Explicit SDK tool
+element and HTTP body budgets are required; upgrading the SDK alone does not enable
+the allocation defense. Stdio remains the default. See `docs/MCP_SECURITY.md`.
+
+Upload decoding validates raster signatures before Sharp, then uses actual native
+decoding, dimensions and quotas. Two historical synthetic PNG test literals had an
+invalid IDAT CRC and truncated deflate stream. Replace those fixtures with a valid
+generated one-pixel PNG; do not weaken the decoder to accept corrupt input.
+
+CI fails on full-audit high/critical records, including build tools. Residual moderate findings and
+the exact inactive entry points are tracked in `docs/DEPENDENCY_SECURITY.md`, rather
+than suppressed or represented as a clean audit. Reassess when dependencies,
+development-server configuration or application imports change.

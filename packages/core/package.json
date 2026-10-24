@@ -26,11 +26,11 @@
     "bullmq": "5.78.1",
     "drizzle-orm": "0.45.2",
     "ioredis": "5.11.1",
-    "sharp": "0.34.5"
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@types/node": "22.18.9",
     "typescript": "5.9.3",
-    "vitest": "3.2.6"
+    "vitest": "3.2.7"
   }
 }

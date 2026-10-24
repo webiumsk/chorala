@@ -43,6 +43,17 @@ async function decodeDataUrl(dataUrl: string) {
   ) {
     throw badRequest('Invalid or oversized attachment')
   }
+  // Reject unsupported formats before entering a native decoder (notably SVG).
+  const headers: Record<string, boolean> = {
+    'image/png': bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+    'image/jpeg': bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255,
+    'image/gif': ['GIF87a', 'GIF89a'].includes(bytes.toString('ascii', 0, 6)),
+    'image/webp':
+      bytes.length >= 12 &&
+      bytes.toString('ascii', 0, 4) === 'RIFF' &&
+      bytes.toString('ascii', 8, 12) === 'WEBP',
+  }
+  if (!headers[mimeType]) throw badRequest('Attachment type does not match its image header')
   try {
     const image = sharp(bytes, { limitInputPixels: MAX_IMAGE_PIXELS, failOn: 'warning' })
     const metadata = await image.metadata()

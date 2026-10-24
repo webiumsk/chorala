@@ -18,15 +18,15 @@
     "@chorala/core": "workspace:*",
     "@chorala/db": "workspace:*",
     "@chorala/types": "workspace:*",
-    "better-auth": "1.6.18",
+    "better-auth": "1.6.33",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
-    "next": "15.5.19",
+    "next": "15.5.28",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "sharp": "0.34.5",
+    "sharp": "0.35.5",
     "tailwind-merge": "3.6.0",
-    "zod": "4.4.3"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",
@@ -34,7 +34,7 @@
     "@types/node": "22.18.9",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
-    "postcss": "8.5.15",
+    "postcss": "8.5.31",
     "tailwindcss": "4.3.1",
     "typescript": "5.9.3"
   }

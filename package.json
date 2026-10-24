@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0",
-  "description": "Chorala — open-core, embeddable, multilingual, AI-native product-feedback platform.",
+  "description": "Chorala \u2014 open-core, embeddable, multilingual, AI-native product-feedback platform.",
   "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=22"
@@ -31,6 +31,24 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp"
-    ]
+    ],
+    "overrides": {
+      "vitest>tinypool": "2.1.2",
+      "hono@^4": "4.13.11",
+      "@hono/node-server@^1": "1.19.15",
+      "@hono/node-server@^2": "2.0.10",
+      "proxy-addr@<2.0.8": "2.0.8",
+      "body-parser@^2": "2.4.0",
+      "fast-uri@^3": "3.1.9",
+      "ip-address@^10": "10.7.4",
+      "vite@^7": "7.3.7",
+      "nanoid@^3": "3.3.20",
+      "source-map-js@^1": "1.2.2",
+      "qs@^6": "6.16.0",
+      "postcss@^8": "8.5.31",
+      "js-yaml@^4": "4.3.2",
+      "brace-expansion@^2": "2.1.7",
+      "esbuild@^0.27.0": "0.28.1"
+    }
   }
 }

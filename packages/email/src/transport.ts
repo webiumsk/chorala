@@ -10,12 +10,12 @@ export interface EmailTransport {
   send(args: SendArgs): Promise<void>
 }
 
-/** No-op transport — logs and drops (email not configured). App still runs (SPEC §2). */
+/** No-op transport logs configuration state without exposing message contents or recipients. */
 class NoopTransport implements EmailTransport {
   readonly name = 'none'
   readonly enabled = false
-  async send(args: SendArgs) {
-    console.warn(`[email] (noop) would send "${args.subject}" → ${args.to}`)
+  async send(_args: SendArgs) {
+    console.warn('[email] No email transport configured; message skipped.')
   }
 }
 

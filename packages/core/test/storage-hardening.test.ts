@@ -63,6 +63,7 @@ test('rejects active content, MIME spoofing, invalid base64 and oversized encode
   const { project, user } = await fixture()
   for (const dataUrl of [
     `data:image/png;base64,${Buffer.from('<script>alert(1)</script>').toString('base64')}`,
+    `data:image/png;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>').toString('base64')}`,
     `data:image/jpeg;base64,${png.toString('base64')}`,
     'data:image/png;base64,%%%%',
     `data:image/png;base64,${'A'.repeat(4 * Math.ceil(env.CHORALA_ATTACHMENT_MAX_BYTES / 3) + 4)}`,

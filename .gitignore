@@ -37,3 +37,15 @@ pnpm-debug.log*
 
 # Local attachment store
 .uploads/
+
+# Deployment tooling and protected recovery artifacts
+__pycache__/
+*.py[cod]
+*.tar.gpg
+*.gpg
+*.tar
+*.tar.gz
+.chorala-backup-*/
+*.dump
+deploy/backups/
+deploy/target-report.json

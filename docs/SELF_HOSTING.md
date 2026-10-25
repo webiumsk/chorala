@@ -1,5 +1,10 @@
 # Operating the owned Chorala fork
 
+For the Satflux deployment on an existing shared host with Traefik, use the
+[image-only deployment runbook](DEPLOYMENT_SATFLUX.md) and standalone
+`deploy/compose.traefik.yml`. The original Compose commands below describe the
+bundled Caddy edge and must not take ports 80/443 from an existing proxy.
+
 This owned fork is intended for Satflux, preserving the upstream feature set.
 Upstream multi-project capabilities remain available without a new SaaS offering.
 Use a separate project public key, end-user signing secret and allowed-origin list

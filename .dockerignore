@@ -15,3 +15,10 @@
 **/*.dump
 *.log
 *.png
+**/__pycache__
+**/*.pyc
+**/*.tar.gpg
+**/*.gpg
+**/*.tar
+**/*.tar.gz
+**/.chorala-backup-*

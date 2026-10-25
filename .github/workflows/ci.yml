@@ -54,6 +54,11 @@ jobs:
       - run: pnpm audit --audit-level high
       - run: pnpm lint
       - run: pnpm typecheck
+      - name: Deployment preparation guards
+        run: |
+          python3 -m unittest discover -s deploy/tests -p 'test_*.py'
+          python3 -m py_compile deploy/*.py
+          bash -n deploy/backup.sh deploy/restore.sh
       - run: pnpm build
       # Provision the schema + seed data the db/api tests read.
       - run: pnpm db:migrate

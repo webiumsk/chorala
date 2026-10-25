@@ -320,6 +320,30 @@ class IngressTests(unittest.TestCase):
 
 
 class RestoreSequenceTests(unittest.TestCase):
+    def test_restore_only_adds_bounded_fowner_for_existing_redis_owned_directories(self):
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.object(P, "run") as operation:
+            archive = Path(temporary) / "volume.tar"
+            volume = "satflux-feedback-restore-unit_redisdata"
+            image = "sha256:" + "1" * 64
+            P.copy_volume(image, volume, archive)
+            backup = operation.call_args.args[0]
+            P.copy_volume(image, volume, archive, restore=True)
+            restore = operation.call_args.args[0]
+            capabilities = lambda command: [command[index + 1] for index, arg in enumerate(command) if arg == "--cap-add"]
+            self.assertEqual(capabilities(backup), ["DAC_OVERRIDE"])
+            self.assertEqual(capabilities(restore), ["DAC_OVERRIDE", "FOWNER"])
+            for command in (backup, restore):
+                self.assertEqual(command[command.index("--cap-drop") + 1], "ALL")
+                self.assertEqual(command[command.index("--network") + 1], "none")
+                self.assertIn("--read-only", command)
+                self.assertEqual(command[command.index("--security-opt") + 1], "no-new-privileges")
+                self.assertNotIn("--privileged", command)
+                self.assertNotIn("CHOWN", capabilities(command))
+                self.assertEqual(command.count("--mount"), 1)
+                self.assertIn(f"source={volume},target=/snapshot", command[command.index("--mount") + 1])
+            self.assertIn("--no-same-owner", restore)
+            self.assertIn("-i", restore)
+
     def test_restore_creates_but_never_starts_writers_or_recreates_existing_data_services(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

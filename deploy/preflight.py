@@ -356,6 +356,9 @@ def copy_volume(image, volume, target, restore=False):
     """Use a trusted loaded image with no network/privilege and one exact volume."""
     command = ["docker", "run", "--rm", "--network", "none", "--read-only", "--security-opt", "no-new-privileges", "--cap-drop", "ALL", "--cap-add", "DAC_OVERRIDE", "--memory", "128m", "--pids-limit", "32", "--entrypoint", "tar", "--mount", f"type=volume,source={volume},target=/snapshot" + ("" if restore else ",readonly"), image]
     if restore:
+        # Fresh Redis directories are owned by Redis, not this root helper. FOWNER
+        # permits restoring their timestamps/modes without granting chown or host access.
+        command[-1:-1] = ["--cap-add", "FOWNER"]
         command.insert(2, "-i")
         with target.open("rb") as stream:
             run(command + ["--no-same-owner", "-xpf", "-", "-C", "/snapshot"], stdin=stream, timeout=3600)

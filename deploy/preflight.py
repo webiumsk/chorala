@@ -518,7 +518,9 @@ def restore(args):
         command, env = dc(config, args.project, values)
         # Create only private data services and an unstarted API to provision its volume.
         run(command + ["up", "--detach", "--wait", "postgres", "redis"], env=env, timeout=180)
-        run(command + ["create", "--no-deps", "api"], env=env, timeout=90)
+        # Compose create does not start dependencies; preserve existing data services
+        # and never build or pull while provisioning the stopped API upload volume.
+        run(command + ["create", "--no-recreate", "--no-build", "--pull", "never", "api"], env=env, timeout=90)
         run(command + ["stop", "--timeout", "60", "redis"], env=env, timeout=90)
         with (directory / "database.dump").open("rb") as stream:
             run(command + ["exec", "-T", "postgres", "pg_restore", "-U", "chorala", "-d", "chorala", "--exit-on-error", "--no-owner"], env=env, stdin=stream, timeout=3600)

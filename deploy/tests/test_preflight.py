@@ -1,8 +1,11 @@
 """Negative deployment guards use synthetic strings and never mutate Docker."""
 
 import importlib.util
+import hashlib
 import io
+import json
 from copy import deepcopy
+from contextlib import redirect_stdout
 from pathlib import Path
 import tarfile
 import tempfile
@@ -314,6 +317,64 @@ class IngressTests(unittest.TestCase):
     def test_only_edge_and_this_gateway_are_accepted(self):
         with mock.patch.object(P, "run", side_effect=["edge-id", '{"edge-id":{},"gateway-id":{}}', "satflux-feedback gateway"]):
             P.require_dedicated_proxy(settings(), "satflux-feedback")
+
+
+class RestoreSequenceTests(unittest.TestCase):
+    def test_restore_creates_but_never_starts_writers_or_recreates_existing_data_services(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            archive_path = directory / "paired.tar"
+            target = directory / "new-restore"
+            values = settings()
+            values["CHORALA_TRUSTED_PROXY_CIDRS"] = "192.0.2.4/32"
+            images = {name: {"id": "sha256:" + "1" * 64, "architecture": "amd64"} for name in P.IMAGE_KEYS}
+            nested = io.BytesIO()
+            with tarfile.open(fileobj=nested, mode="w") as archive:
+                entry = tarfile.TarInfo(".")
+                entry.type = tarfile.DIRTYPE
+                entry.mode = 0o700
+                archive.addfile(entry)
+            files = {
+                "protected.env": ("\n".join(f"{key}={value}" for key, value in values.items()) + "\n").encode(),
+                "compose.traefik.yml": (ROOT / "compose.traefik.yml").read_bytes(),
+                "Caddyfile": (ROOT / "Caddyfile").read_bytes(),
+                "database.dump": b"synthetic database payload",
+                "uploads.tar": nested.getvalue(), "redis.tar": nested.getvalue(),
+                "metadata.json": json.dumps({"backup_format": 1, "images": images}).encode(),
+            }
+            files["SHA256SUMS.json"] = json.dumps({name: hashlib.sha256(data).hexdigest() for name, data in files.items()}).encode()
+            with tarfile.open(archive_path, "w") as archive:
+                for name, content in files.items():
+                    entry = tarfile.TarInfo(name)
+                    entry.size = len(content)
+                    entry.mode = 0o600
+                    archive.addfile(entry, io.BytesIO(content))
+            archive_path.chmod(0o600)
+            args = SimpleNamespace(archive=str(archive_path), target_dir=str(target),
+                                   project="satflux-feedback-restore-sequence", confirm_empty_target=True)
+            operations = []
+
+            def operation(command, **kwargs):
+                operations.append(command)
+                return ""
+
+            def prepared(path, project):
+                restored = P.validate_settings(P.load_env(path))
+                self.assertEqual(restored["CHORALA_EMAIL_TRANSPORT"], "none")
+                self.assertEqual(restored["CHORALA_AI_PROVIDER"], "none")
+                return path, restored, {}
+
+            with mock.patch.object(P, "require_local_daemon"), mock.patch.object(P, "local_images", return_value=images), mock.patch.object(P, "run", side_effect=operation), mock.patch.object(P, "prepare", side_effect=prepared), mock.patch.object(P, "copy_volume") as snapshots, mock.patch.object(P, "volume_name", side_effect=lambda project, logical: logical), redirect_stdout(io.StringIO()):
+                P.restore(args)
+            compose = [command for command in operations if command[:2] == ["docker", "compose"]]
+            creation = [command[command.index("create"):] for command in compose if "create" in command]
+            self.assertEqual(creation, [["create", "--no-recreate", "--no-build", "--pull", "never", "api"]])
+            starts = [command[command.index("start"):] for command in compose if "start" in command]
+            self.assertEqual(starts, [["start", "redis"]])
+            ups = [command[command.index("up"):] for command in compose if "up" in command]
+            self.assertEqual(ups, [["up", "--detach", "--wait", "postgres", "redis"]])
+            self.assertFalse(any("--force-recreate" in command or "--no-deps" in command for command in compose))
+            self.assertEqual(snapshots.call_count, 2)
 
 
 if __name__ == "__main__":

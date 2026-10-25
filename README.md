@@ -1,5 +1,11 @@
 # Chorala
 
+This is **webiumsk's independently maintained fork for Satflux feedback**, based on
+upstream `2ge/chorala` at `6cb0cc7`. The hosted `chorala.com` service is not required.
+See [fork scope and validation](docs/FORK_SCOPE.md) and the
+[self-hosting guide](docs/SELF_HOSTING.md). Existing project features remain available;
+this fork does not introduce a separate hosted product. Original licenses and notices apply.
+
 > **Chorala** is an open-core, embeddable, multilingual, AI-native product-feedback
 > platform — a self-hostable alternative to Canny / Featurebase / Frill.
 >
@@ -28,34 +34,43 @@ scope and `CHORALA_` env prefix as stable identifiers (not user-visible).
 
 ## Quick start
 
-### Self-host (one command)
+### Self-host
 
 ```bash
 cp .env.example .env
-# set CHORALA_AUTH_SECRET — e.g. openssl rand -base64 32
-docker compose up
+# Configure independent random CHORALA_AUTH_SECRET and CHORALA_DB_PASSWORD,
+# owned public URLs, and explicit initial-administrator credentials.
+docker compose config --quiet
+docker compose up -d --build
 ```
 
 Caddy serves the stack on `:80` (set `CHORALA_DOMAIN=feedback.example.com` in `.env` for
-automatic HTTPS). The API auto-runs migrations on boot. Create the first admin with:
+automatic HTTPS). A one-shot migration service runs before the API. Create the first
+administrator on a fresh installation with:
 
 ```bash
-docker compose exec api pnpm db:seed            # demo org + admin + sample data
 docker compose exec api pnpm --filter @chorala/api seed:admin
-# → admin@chorala.com / choralaadmin123
 ```
 
-### Local development
+Set `CHORALA_BOOTSTRAP_EMAIL`, `CHORALA_BOOTSTRAP_PASSWORD` (16-128 characters) and
+optionally `CHORALA_BOOTSTRAP_NAME` in the protected environment first. Remove the
+bootstrap password after success. Bootstrap refuses existing accounts and never
+resets them. Demo seeds are destructive test fixtures and must not be used in production.
+Public self-host signup is disabled by default. Follow the self-hosting guide for
+controlled staff onboarding, persistent attachments and backup/restore.
+
+### Local development with disposable data
 
 ```bash
 pnpm install
 docker compose up -d postgres redis             # or use your own PG16 + Redis
 pnpm db:migrate && pnpm db:seed
-pnpm --filter @chorala/api seed:admin              # sets the admin password
 pnpm dev                                         # api :8787, dashboard :3015, worker
 ```
 
-Open the dashboard (`:3015`), sign in, and load the widget demo at
+The demo database seed does not provision a production administrator credential.
+Use a fresh disposable database and the explicit bootstrap command when testing login.
+Open the dashboard (`:3015`) and load the widget demo at
 `http://localhost:8787/widget-demo.html?key=<publicKey>`.
 
 ## Architecture

@@ -158,9 +158,9 @@ describe('submission context (appVersion + metadata)', () => {
 })
 
 describe('attachments (bug-report screenshots)', () => {
-  // 1×1 transparent PNG
+  // valid 1×1 PNG
   const PNG =
-    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWP4////fwAJ+wP9CNHoHgAAAABJRU5ErkJggg=='
 
   test('uploads a screenshot, links it to a post, and rejects non-images', async () => {
     const up = await app.request('/api/v1/public/attachments', {

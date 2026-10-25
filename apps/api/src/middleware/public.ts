@@ -24,8 +24,11 @@ async function enforceRateLimit(c: Context, projectId: string) {
     if (count > limit) throw new AppError('rate_limited', 'Rate limit exceeded', 429)
   } catch (err) {
     if (err instanceof AppError) throw err
-    // Redis unavailable → fail open (graceful degradation, SPEC §2) rather than 500.
-    console.warn('[api] rate-limit check skipped (redis error):', (err as Error).message)
+    // Reads can degrade; expensive writes must not become unlimited during an outage.
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(c.req.method)) {
+      throw new AppError('service_unavailable', 'Public writes are temporarily unavailable', 503)
+    }
+    console.warn('[api] read rate-limit check unavailable')
   }
 }
 

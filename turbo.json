@@ -31,7 +31,8 @@
       "outputs": ["coverage/**"]
     },
     "test:e2e": {
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["BASE_URL", "E2E_ADMIN_EMAIL", "E2E_ADMIN_PASSWORD"]
     }
   }
 }

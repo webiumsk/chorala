@@ -52,10 +52,14 @@ export const createPostInput = z.object({
 })
 export type CreatePostInput = z.infer<typeof createPostInput>
 
+/** Hard ceilings bound allocation before JSON/base64 decoding and image processing. */
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+export const MAX_ATTACHMENT_DATA_URL_LENGTH = 4 * Math.ceil(MAX_ATTACHMENT_BYTES / 3) + 128
+
 /** Upload an attachment (currently a bug-report screenshot) as a data URL. */
 export const createAttachmentInput = z.object({
   // `data:<mime>;base64,<payload>` — kept small by per-file + per-project byte limits.
-  dataUrl: z.string().startsWith('data:'),
+  dataUrl: z.string().startsWith('data:').max(MAX_ATTACHMENT_DATA_URL_LENGTH),
   kind: z.enum(['screenshot', 'file']).default('screenshot'),
 })
 export type CreateAttachmentInput = z.infer<typeof createAttachmentInput>

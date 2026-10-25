@@ -1,4 +1,5 @@
 import type { MemberRole } from '@chorala/types'
+import { forbidden } from './errors.ts'
 
 /** The authenticated caller's scope, resolved by the API layer and passed into services. */
 export type AuthContext = {
@@ -26,3 +27,19 @@ export const canModerate = (ctx: AuthContext): boolean =>
   (ctx.kind === 'session' &&
     (ctx.role === 'owner' || ctx.role === 'admin' || ctx.role === 'moderator')) ||
   (ctx.kind === 'apikey' && (ctx.scopes?.includes('write') ?? false))
+
+/** Staff roles and API-key scopes grant authority independently of project membership. */
+export function assertPermission(ctx: AuthContext, permission: 'read' | 'write' | 'moderate') {
+  const allowed =
+    permission === 'moderate'
+      ? canModerate(ctx)
+      : ctx.kind === 'apikey'
+        ? (ctx.scopes?.includes(permission) ?? false)
+        : permission === 'write'
+          ? canManageOrg(ctx)
+          : ctx.role === 'owner' ||
+            ctx.role === 'admin' ||
+            ctx.role === 'moderator' ||
+            ctx.role === 'member'
+  if (!allowed) throw forbidden(`Missing ${permission} permission`)
+}

@@ -1,0 +1,15 @@
+# Review against the actual Passbolt stack before use. This fragment never starts
+# a service by itself. The observed Traefik currently has only passbolt_default.
+# Preserve that default network and add a dedicated ingress network permanently.
+# Verify the actual Compose service name is "traefik"; keep all other networks if
+# that source definition differs. Do not use this file as a standalone stack.
+services:
+  traefik:
+    networks:
+      default: {}
+      satflux_feedback_ingress: {}
+
+networks:
+  satflux_feedback_ingress:
+    external: true
+    name: satflux-feedback-proxy

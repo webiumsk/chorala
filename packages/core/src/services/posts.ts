@@ -11,6 +11,7 @@ import {
   eq,
   ilike,
   inArray,
+  members,
   newId,
   or,
   posts,
@@ -20,7 +21,7 @@ import {
   votes,
 } from '@chorala/db'
 import type { AdminCreatePostInput, PostSort, UpdatePostInput } from '@chorala/types'
-import type { AuthContext } from '../context.ts'
+import { type AuthContext, assertPermission } from '../context.ts'
 import { badRequest, conflict, notFound } from '../errors.ts'
 import {
   enqueueGithubAutoCreate,
@@ -311,8 +312,10 @@ async function assertBoardInProject(projectId: string, boardId: string) {
 }
 
 export async function createPost(ctx: AuthContext, projectId: string, input: AdminCreatePostInput) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   await assertBoardInProject(projectId, input.boardId)
+  if (input.statusId) await assertStatusInProject(projectId, input.statusId)
   const id = newId('post')
   const sent = analyzeSentiment(`${input.title}\n${input.body}`)
   await db.insert(posts).values({
@@ -343,6 +346,7 @@ export async function createReviewPost(
   projectId: string,
   input: { title: string; body: string; source: Record<string, unknown> },
 ) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   const projectBoards = await db
     .select({ id: boards.id, kind: boards.kind })
@@ -373,6 +377,7 @@ export async function createReviewPost(
 
 /** Approve a pending AI-ingested post → it goes live (and fires the normal created hooks). */
 export async function approvePost(ctx: AuthContext, projectId: string, id: string) {
+  assertPermission(ctx, 'write')
   const post = await getPost(ctx, projectId, id)
   if (post.reviewStatus !== 'pending') return post
   await db.update(posts).set({ reviewStatus: 'none' }).where(eq(posts.id, id))
@@ -382,6 +387,7 @@ export async function approvePost(ctx: AuthContext, projectId: string, id: strin
 
 /** Dismiss a pending AI-ingested post → hidden from the review queue, never published. */
 export async function dismissPost(ctx: AuthContext, projectId: string, id: string) {
+  assertPermission(ctx, 'write')
   await getPost(ctx, projectId, id)
   await db.update(posts).set({ reviewStatus: 'dismissed' }).where(eq(posts.id, id))
   return { id, dismissed: true }
@@ -393,14 +399,23 @@ export async function updatePost(
   id: string,
   input: UpdatePostInput,
 ) {
+  assertPermission(ctx, 'write')
   await getPost(ctx, projectId, id)
   if (input.boardId) await assertBoardInProject(projectId, input.boardId)
+  if (input.statusId) await assertStatusInProject(projectId, input.statusId)
+  if (input.assigneeMemberId) {
+    const [assignee] = await db
+      .select({ id: members.id })
+      .from(members)
+      .where(and(eq(members.id, input.assigneeMemberId), eq(members.orgId, ctx.orgId)))
+    if (!assignee) throw notFound('Member')
+  }
   await db
     .update(posts)
     .set({
       title: input.title,
       body: input.body,
-      statusId: input.statusId ?? undefined,
+      statusId: input.statusId,
       boardId: input.boardId,
       isPinned: input.isPinned,
       eta: input.eta ? new Date(input.eta) : input.eta === null ? null : undefined,
@@ -411,12 +426,21 @@ export async function updatePost(
   return getPost(ctx, projectId, id)
 }
 
+async function assertStatusInProject(projectId: string, statusId: string) {
+  const [status] = await db
+    .select({ id: statuses.id })
+    .from(statuses)
+    .where(and(eq(statuses.id, statusId), eq(statuses.projectId, projectId)))
+  if (!status) throw notFound('Status')
+}
+
 export async function changeStatus(
   ctx: AuthContext,
   projectId: string,
   id: string,
   statusId: string | null,
 ) {
+  assertPermission(ctx, 'write')
   await getPost(ctx, projectId, id)
   let statusKind: string | null = null
   if (statusId) {
@@ -436,6 +460,7 @@ export async function changeStatus(
 }
 
 export async function setPinned(ctx: AuthContext, projectId: string, id: string, pinned: boolean) {
+  assertPermission(ctx, 'write')
   await getPost(ctx, projectId, id)
   await db.update(posts).set({ isPinned: pinned }).where(eq(posts.id, id))
   return getPost(ctx, projectId, id)
@@ -461,6 +486,7 @@ export async function mergePost(
   sourceId: string,
   targetId: string,
 ) {
+  assertPermission(ctx, 'write')
   if (sourceId === targetId) throw badRequest('Cannot merge a post into itself')
   const source = await getPost(ctx, projectId, sourceId)
   const target = await getPost(ctx, projectId, targetId)
@@ -488,6 +514,7 @@ export async function mergePost(
 }
 
 export async function deletePost(ctx: AuthContext, projectId: string, id: string) {
+  assertPermission(ctx, 'write')
   await getPost(ctx, projectId, id)
   await db.delete(posts).where(eq(posts.id, id))
   return { id, deleted: true }

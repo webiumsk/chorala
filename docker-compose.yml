@@ -1,16 +1,13 @@
-# Chorala — full self-host stack. One command:
-#
-#   cp .env.example .env   # set CHORALA_AUTH_SECRET (openssl rand -base64 32)
-#   docker compose up
-#
-# Caddy is the only service that publishes ports (80/443). Postgres + Redis stay on
-# the internal network. Set CHORALA_DOMAIN in .env for automatic HTTPS.
+# Owned Chorala self-host stack. Copy .env.example, set random secrets and public URLs,
+# then build and start the services. See docs/SELF_HOSTING.md before production use.
+# Only Caddy publishes ports; application/database services stay on the Compose network.
 services:
   postgres:
     image: pgvector/pgvector:pg16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: chorala
-      POSTGRES_PASSWORD: chorala
+      POSTGRES_PASSWORD: ${CHORALA_DB_PASSWORD:?Set a random URL-safe CHORALA_DB_PASSWORD in .env}
       POSTGRES_DB: chorala
     volumes:
       - chorala_pgdata:/var/lib/postgresql/data
@@ -22,6 +19,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     command: ['redis-server', '--appendonly', 'yes']
     volumes:
       - chorala_redisdata:/data
@@ -31,45 +29,75 @@ services:
       timeout: 5s
       retries: 10
 
+  # One migration process completes before any application or worker starts.
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    restart: 'no'
+    env_file: .env
+    environment: &application-environment
+      NODE_ENV: production
+      DATABASE_URL: postgres://chorala:${CHORALA_DB_PASSWORD:?Set CHORALA_DB_PASSWORD}@postgres:5432/chorala
+      REDIS_URL: redis://redis:6379
+      CHORALA_UPLOAD_DIR: /var/lib/chorala/uploads
+      CHORALA_API_PORT: 8787
+    command: ['pnpm', 'db:migrate']
+    depends_on:
+      postgres: { condition: service_healthy }
+
   api:
     build:
       context: .
       dockerfile: docker/Dockerfile.api
+    restart: unless-stopped
     env_file: .env
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgres://chorala:chorala@postgres:5432/chorala
-      REDIS_URL: redis://redis:6379
+    environment: *application-environment
+    volumes:
+      - chorala_uploads:/var/lib/chorala/uploads
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:8787/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 6
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
 
   worker:
     build:
       context: .
       dockerfile: docker/Dockerfile.worker
+    restart: unless-stopped
     env_file: .env
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgres://chorala:chorala@postgres:5432/chorala
-      REDIS_URL: redis://redis:6379
+    environment: *application-environment
+    volumes:
+      - chorala_uploads:/var/lib/chorala/uploads:ro
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-      api: { condition: service_started }
+      api: { condition: service_healthy }
 
   dashboard:
     build:
       context: .
       dockerfile: docker/Dockerfile.dashboard
+    restart: unless-stopped
     env_file: .env
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgres://chorala:chorala@postgres:5432/chorala
-      REDIS_URL: redis://redis:6379
+    environment: *application-environment
+    volumes:
+      - chorala_uploads:/var/lib/chorala/uploads:ro
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3015/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 6
     depends_on:
       postgres: { condition: service_healthy }
-      api: { condition: service_started }
+      api: { condition: service_healthy }
 
   caddy:
     image: caddy:2-alpine
@@ -84,11 +112,12 @@ services:
       - chorala_caddydata:/data
       - chorala_caddyconfig:/config
     depends_on:
-      - api
-      - dashboard
+      api: { condition: service_healthy }
+      dashboard: { condition: service_healthy }
 
 volumes:
   chorala_pgdata:
   chorala_redisdata:
+  chorala_uploads:
   chorala_caddydata:
   chorala_caddyconfig:

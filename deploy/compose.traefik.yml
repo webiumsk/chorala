@@ -1,0 +1,166 @@
+# Standalone image-only profile. Do not merge with the source-build Compose file.
+# Resource caps are initial operating budgets, not measured minimum requirements.
+name: satflux-feedback
+
+x-runtime: &runtime
+  restart: unless-stopped
+  pull_policy: never
+  security_opt: [no-new-privileges:true]
+  labels:
+    traefik.enable: 'false'
+  logging:
+    driver: json-file
+    options: {max-size: '10m', max-file: '3'}
+
+x-application: &application
+  NODE_ENV: production
+  DATABASE_URL: postgres://chorala:${CHORALA_DB_PASSWORD:?Set CHORALA_DB_PASSWORD}@postgres:5432/chorala
+  REDIS_URL: redis://redis:6379
+  CHORALA_UPLOAD_DIR: /var/lib/chorala/uploads
+  CHORALA_API_PORT: '8787'
+  CHORALA_DEPLOYMENT: selfhost
+  CHORALA_ALLOW_SIGNUP: 'false'
+
+services:
+  postgres:
+    <<: *runtime
+    image: ${CHORALA_POSTGRES_IMAGE:?Load the pinned PostgreSQL image}
+    mem_limit: 1g
+    cpus: 0.75
+    pids_limit: 256
+    environment:
+      POSTGRES_USER: chorala
+      POSTGRES_PASSWORD: ${CHORALA_DB_PASSWORD:?Set CHORALA_DB_PASSWORD}
+      POSTGRES_DB: chorala
+    volumes: [pgdata:/var/lib/postgresql/data]
+    networks: [data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U chorala -d chorala']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    <<: *runtime
+    image: ${CHORALA_REDIS_IMAGE:?Load the pinned Redis image}
+    mem_limit: 256m
+    cpus: 0.25
+    pids_limit: 64
+    # No eviction: queue pressure fails explicitly rather than deleting pending jobs.
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory', '128mb', '--maxmemory-policy', 'noeviction']
+    volumes: [redisdata:/data]
+    networks: [data]
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  migrate:
+    <<: *runtime
+    image: ${CHORALA_API_IMAGE:?Load the pinned API image}
+    restart: 'no'
+    mem_limit: 512m
+    cpus: 0.5
+    pids_limit: 128
+    env_file: .env
+    environment: *application
+    command: ['pnpm', 'db:migrate']
+    networks: [data]
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  api:
+    <<: *runtime
+    image: ${CHORALA_API_IMAGE:?Load the pinned API image}
+    mem_limit: 768m
+    cpus: 1.0
+    pids_limit: 192
+    env_file: .env
+    environment: *application
+    volumes: [uploads:/var/lib/chorala/uploads]
+    networks: [data, web, egress]
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:8787/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 12
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+
+  dashboard:
+    <<: *runtime
+    image: ${CHORALA_DASHBOARD_IMAGE:?Load the pinned dashboard image}
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 192
+    env_file: .env
+    environment: *application
+    volumes: [uploads:/var/lib/chorala/uploads:ro]
+    networks: [data, web, egress]
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3015/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      start_period: 45s
+      retries: 12
+    depends_on:
+      api: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+
+  worker:
+    <<: *runtime
+    image: ${CHORALA_WORKER_IMAGE:?Load the pinned worker image}
+    mem_limit: 512m
+    cpus: 0.5
+    pids_limit: 128
+    env_file: .env
+    environment: *application
+    volumes: [uploads:/var/lib/chorala/uploads:ro]
+    networks: [data, egress]
+    depends_on:
+      api: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  gateway:
+    <<: *runtime
+    image: ${CHORALA_GATEWAY_IMAGE:?Load the pinned Caddy image}
+    mem_limit: 128m
+    cpus: 0.25
+    pids_limit: 64
+    read_only: true
+    tmpfs: [/config, /data, /tmp]
+    environment:
+      CHORALA_TRUSTED_PROXY_CIDRS: ${CHORALA_TRUSTED_PROXY_CIDRS:?Set exact Traefik IP CIDRs}
+    volumes: [./Caddyfile:/etc/caddy/Caddyfile:ro]
+    networks: [web, proxy]
+    labels:
+      traefik.enable: 'true'
+      traefik.docker.network: ${TRAEFIK_NETWORK:?Set the existing Traefik network}
+      traefik.http.routers.satflux-feedback-https.rule: Host(`feedback.satflux.io`)
+      traefik.http.routers.satflux-feedback-https.entrypoints: ${TRAEFIK_HTTPS_ENTRYPOINT:?Set the existing HTTPS entrypoint}
+      traefik.http.routers.satflux-feedback-https.tls: 'true'
+      traefik.http.routers.satflux-feedback-https.tls.certresolver: ${TRAEFIK_CERT_RESOLVER:?Set the existing TLS resolver}
+      traefik.http.routers.satflux-feedback-https.service: satflux-feedback-gateway
+      traefik.http.services.satflux-feedback-gateway.loadbalancer.server.port: '8080'
+      traefik.http.services.satflux-feedback-gateway.loadbalancer.passhostheader: 'true'
+    depends_on:
+      api: {condition: service_healthy}
+      dashboard: {condition: service_healthy}
+
+networks:
+  data: {internal: true}
+  web: {internal: true}
+  egress: {}
+  proxy:
+    external: true
+    name: ${TRAEFIK_NETWORK:?Set the existing Traefik network}
+
+volumes:
+  pgdata: {}
+  redisdata: {}
+  uploads: {}

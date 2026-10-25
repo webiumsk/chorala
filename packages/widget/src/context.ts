@@ -1,5 +1,14 @@
-// Auto-collected submission context (Sentry-style "contexts"), attached to every post the
-// widget creates. No host configuration required — read straight off the browser globals.
+// Collect diagnostic context without copying host-page identifiers or credentials.
+
+/** Keep only an HTTP origin: paths, user info, queries and fragments can contain secrets. */
+export function contextOrigin(value: string): string | undefined {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.origin : undefined
+  } catch {
+    return undefined
+  }
+}
 
 function parseUserAgent(ua: string): { browser?: string; os?: string } {
   const browser = /Edg\//.test(ua)
@@ -37,8 +46,8 @@ export function collectContext(): Record<string, string> {
   try {
     const ua = navigator.userAgent
     const { browser, os } = parseUserAgent(ua)
-    out.url = location.href
-    out.referrer = document.referrer || undefined
+    out.url = contextOrigin(location.href)
+    out.referrer = contextOrigin(document.referrer)
     out.locale = navigator.language
     out.browser = browser
     out.os = os

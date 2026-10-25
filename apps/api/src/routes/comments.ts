@@ -8,24 +8,30 @@ import { reqParam } from '../util.ts'
 export const commentsRoutes = new Hono<AppEnv>()
   .get('/', async (c) =>
     c.json(
-      await comments.listComments(reqParam(c, 'projectId'), reqParam(c, 'postId'), {
-        includeInternal: true,
-      }),
+      await comments.listAdminComments(
+        c.get('auth'),
+        reqParam(c, 'projectId'),
+        reqParam(c, 'postId'),
+      ),
     ),
   )
   .post('/', async (c) => {
     const ctx = c.get('auth')
     const input = createCommentInput.parse(await c.req.json())
     return c.json(
-      await comments.createComment(reqParam(c, 'projectId'), reqParam(c, 'postId'), input, {
-        memberId: ctx.memberId,
-      }),
+      await comments.createAdminComment(
+        ctx,
+        reqParam(c, 'projectId'),
+        reqParam(c, 'postId'),
+        input,
+      ),
       201,
     )
   })
   .delete('/:id', async (c) =>
     c.json(
-      await comments.deleteComment(
+      await comments.deleteAdminComment(
+        c.get('auth'),
         reqParam(c, 'projectId'),
         reqParam(c, 'postId'),
         c.req.param('id'),

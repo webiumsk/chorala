@@ -1,10 +1,16 @@
+import { env } from '@chorala/config'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { AuthShell } from '@/components/auth-shell'
 import { RegisterForm } from './register-form'
 
-export const metadata = { title: 'Create your account — Chorala' }
+// Deployment policy is injected at runtime, not baked into the Docker image.
+export const dynamic = 'force-dynamic'
+
+export const metadata = { title: 'Create your account - Chorala' }
 
 export default function RegisterPage() {
+  if (env.CHORALA_DEPLOYMENT !== 'cloud' && !env.CHORALA_ALLOW_SIGNUP) redirect('/login')
   return (
     <AuthShell
       title="Create your account"

@@ -1,3 +1,4 @@
+import { env } from '@chorala/config'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSessionUser } from '@/lib/session'
@@ -6,6 +7,7 @@ import { LoginForm } from './login-form'
 export default async function LoginPage() {
   const user = await getSessionUser()
   if (user) redirect('/admin')
+  const allowSignup = env.CHORALA_DEPLOYMENT === 'cloud' || env.CHORALA_ALLOW_SIGNUP
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden p-6">
@@ -27,18 +29,15 @@ export default async function LoginPage() {
         </div>
         <LoginForm />
         <div className="mt-4 flex items-center justify-between text-xs">
-          <Link href="/register" className="font-medium text-accent hover:underline">
-            Create an account
-          </Link>
+          {allowSignup && (
+            <Link href="/register" className="font-medium text-accent hover:underline">
+              Create an account
+            </Link>
+          )}
           <Link href="/forgot" className="text-ink-soft transition hover:text-ink">
             Forgot password?
           </Link>
         </div>
-        <p className="mt-5 text-center text-xs text-ink-faint">
-          Live demo — explore a real dashboard:{' '}
-          <span className="font-medium text-ink-soft">demo@chorala.com</span> ·{' '}
-          <span className="font-medium text-ink-soft">demodemo</span>
-        </p>
       </div>
     </main>
   )

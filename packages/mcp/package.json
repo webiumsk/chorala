@@ -16,11 +16,11 @@
     "build": "tsc --noEmit -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "biome check .",
-    "test": "tsx test/stdio.test.ts"
+    "test": "tsx --test test/http.test.ts && tsx test/stdio.test.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
-    "zod": "4.4.3"
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "22.18.9",

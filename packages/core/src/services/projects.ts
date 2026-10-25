@@ -11,19 +11,25 @@ import {
   statuses,
 } from '@chorala/db'
 import type { CreateProjectInput, UpdateProjectInput } from '@chorala/types'
-import { type AuthContext, canManageOrg } from '../context.ts'
+import { type AuthContext, assertPermission, canManageOrg } from '../context.ts'
 import { badRequest, conflict, forbidden, notFound } from '../errors.ts'
 import { recordAudit } from './audit.ts'
 
 export async function listProjects(ctx: AuthContext) {
+  assertPermission(ctx, 'read')
   // An api-key caller only ever sees the single project it is scoped to.
   if (ctx.kind === 'apikey' && ctx.projectId) {
-    return db
+    const rows = await db
       .select()
       .from(projects)
       .where(and(eq(projects.orgId, ctx.orgId), eq(projects.id, ctx.projectId)))
+    return rows.map((row) => ({ ...row, endUserJwtSecret: undefined }))
   }
-  return db.select().from(projects).where(eq(projects.orgId, ctx.orgId))
+  const rows = await db.select().from(projects).where(eq(projects.orgId, ctx.orgId))
+  return rows.map((row) => ({
+    ...row,
+    endUserJwtSecret: canManageOrg(ctx) ? row.endUserJwtSecret : undefined,
+  }))
 }
 
 export async function getProject(ctx: AuthContext, id: string) {
@@ -34,7 +40,7 @@ export async function getProject(ctx: AuthContext, id: string) {
     .from(projects)
     .where(and(eq(projects.id, id), eq(projects.orgId, ctx.orgId)))
   if (!row) throw notFound('Project')
-  return row
+  return { ...row, endUserJwtSecret: canManageOrg(ctx) ? row.endUserJwtSecret : undefined }
 }
 
 export async function createProject(ctx: AuthContext, input: CreateProjectInput) {

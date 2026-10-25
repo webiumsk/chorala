@@ -1,12 +1,17 @@
 # syntax=docker/dockerfile:1
 # Chorala dashboard + portal (Next.js 15).
-FROM node:22-slim AS base
+FROM node:24-slim AS base
 RUN corepack enable
 WORKDIR /app
 
 COPY . .
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @chorala/dashboard build
+# Build-time validation uses synthetic, unreachable service settings only. Real
+# credentials are injected at runtime; never pass deployment secrets as build args.
+RUN DATABASE_URL=postgres://build:build@127.0.0.1:9/chorala_build \
+    CHORALA_AUTH_SECRET=synthetic_build_validation_secret_at_least_32_characters \
+    CHORALA_AI_PROVIDER=none CHORALA_EMAIL_TRANSPORT=none \
+    pnpm --filter @chorala/dashboard build
 
 ENV NODE_ENV=production
 EXPOSE 3015

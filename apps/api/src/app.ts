@@ -1,10 +1,12 @@
 import { env } from '@chorala/config'
+import { MAX_ATTACHMENT_DATA_URL_LENGTH } from '@chorala/types'
 import { Hono } from 'hono'
+import { bodyLimit } from 'hono/body-limit'
 import { cors } from 'hono/cors'
 import { auth } from './auth.ts'
 import { DEMO_HTML, readFileSafe, WIDGET_JS, WIDGET_MAP } from './lib/assets.ts'
 import { openapiDocument } from './lib/openapi.ts'
-import { requireAuth } from './middleware/auth.ts'
+import { requireAuth, requirePermission } from './middleware/auth.ts'
 import { notFoundHandler, onError } from './middleware/error.ts'
 import { aiRoutes } from './routes/ai.ts'
 import { analyticsRoutes } from './routes/analytics.ts'
@@ -76,6 +78,14 @@ export function createApp() {
   })
 
   const api = new Hono<AppEnv>()
+  api.use(
+    '*',
+    bodyLimit({
+      maxSize: MAX_ATTACHMENT_DATA_URL_LENGTH + 4096,
+      onError: (c) =>
+        c.json({ error: { code: 'payload_too_large', message: 'Request body is too large' } }, 413),
+    }),
+  )
 
   // Better Auth handler (same-origin from the dashboard, no CORS needed).
   api.on(['GET', 'POST'], '/auth/*', (c) => auth.handler(c.req.raw))
@@ -97,11 +107,12 @@ export function createApp() {
   api.use(
     '*',
     cors({
-      origin: [env.CHORALA_PUBLIC_URL, 'https://www.chorala.com', 'https://idea.2pu.net'],
+      origin: [new URL(env.CHORALA_PUBLIC_URL).origin, new URL(env.CHORALA_API_URL).origin],
       credentials: true,
     }),
   )
   api.use('*', requireAuth)
+  api.use('*', requirePermission)
   api.route('/projects', projectsRoutes)
   api.route('/projects/:projectId/boards', boardsRoutes)
   api.route('/projects/:projectId/statuses', statusesRoutes)

@@ -1,0 +1,50 @@
+# Disposable databases only. No production volumes or public listeners.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: chorala_test
+      POSTGRES_PASSWORD: synthetic_test_password
+      POSTGRES_DB: chorala_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U chorala_test -d chorala_test']
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  runner:
+    image: chorala-test-runner:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.test
+    user: '1000:1000'
+    working_dir: /app
+    environment:
+      NODE_ENV: test
+      DATABASE_URL: postgres://chorala_test:synthetic_test_password@postgres:5432/chorala_test
+      REDIS_URL: redis://redis:6379
+      CHORALA_AUTH_SECRET: synthetic_test_secret_at_least_32_bytes_long
+      CHORALA_AI_PROVIDER: none
+      CHORALA_EMAIL_TRANSPORT: none
+      CHORALA_DEPLOYMENT: selfhost
+      CHORALA_UPLOAD_DIR: /tmp/chorala-test-uploads
+      TURBO_TELEMETRY_DISABLED: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+    volumes:
+      - .:/app
+    profiles: ['tools']
+
+networks:
+  default:
+    internal: true

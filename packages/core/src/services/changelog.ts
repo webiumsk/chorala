@@ -1,9 +1,11 @@
 import { and, changelogEntries, db, desc, eq, newId } from '@chorala/db'
 import type { CreateChangelogInput, UpdateChangelogInput } from '@chorala/types'
-import type { AuthContext } from '../context.ts'
+import { type AuthContext, assertPermission } from '../context.ts'
 import { notFound } from '../errors.ts'
 import { enqueueNotification, enqueueWebhookEvent } from '../queues.ts'
+import { getPost } from './posts.ts'
 import { getProject } from './projects.ts'
+import { getSegment } from './segments.ts'
 
 export async function listChangelog(
   ctx: AuthContext,
@@ -34,7 +36,10 @@ export async function createChangelog(
   projectId: string,
   input: CreateChangelogInput,
 ) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
+  for (const postId of input.linkedPostIds) await getPost(ctx, projectId, postId)
+  if (input.segmentId) await getSegment(ctx, projectId, input.segmentId)
   const [row] = await db
     .insert(changelogEntries)
     .values({
@@ -62,7 +67,10 @@ export async function updateChangelog(
   id: string,
   input: UpdateChangelogInput,
 ) {
+  assertPermission(ctx, 'write')
   const existing = await getEntry(ctx, projectId, id)
+  for (const postId of input.linkedPostIds ?? []) await getPost(ctx, projectId, postId)
+  if (input.segmentId) await getSegment(ctx, projectId, input.segmentId)
   const becomingPublished = input.status === 'published' && existing.status !== 'published'
   const [row] = await db
     .update(changelogEntries)
@@ -85,6 +93,7 @@ export async function updateChangelog(
 }
 
 export async function deleteChangelog(ctx: AuthContext, projectId: string, id: string) {
+  assertPermission(ctx, 'write')
   await getEntry(ctx, projectId, id)
   await db.delete(changelogEntries).where(eq(changelogEntries.id, id))
   return { id, deleted: true }

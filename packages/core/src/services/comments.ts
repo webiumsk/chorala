@@ -1,6 +1,8 @@
 import { and, asc, comments, db, eq, isNull, newId, posts, sql } from '@chorala/db'
+import { type AuthContext, assertPermission } from '../context.ts'
 import { notFound } from '../errors.ts'
 import { enqueueNotification, enqueueWebhookEvent } from '../queues.ts'
+import { getProject } from './projects.ts'
 
 type CommentAuthor = { endUserId?: string; memberId?: string }
 
@@ -46,6 +48,15 @@ export async function createComment(
   author: CommentAuthor,
 ) {
   await assertPostInProject(projectId, postId)
+  if (input.parentCommentId) {
+    const [parent] = await db
+      .select({ id: comments.id, isInternal: comments.isInternal, hiddenAt: comments.hiddenAt })
+      .from(comments)
+      .where(and(eq(comments.id, input.parentCommentId), eq(comments.postId, postId)))
+    if (!parent || (author.endUserId && (parent.isInternal || parent.hiddenAt))) {
+      throw notFound('Comment')
+    }
+  }
   const id = newId('comment')
   const [row] = await db
     .insert(comments)
@@ -75,4 +86,39 @@ export async function deleteComment(projectId: string, postId: string, id: strin
   await db.delete(comments).where(eq(comments.id, id))
   await recountComments(postId)
   return { id, deleted: true }
+}
+
+/** Staff comment reads must authorize the organization before exposing internal notes. */
+export async function listAdminComments(
+  ctx: AuthContext,
+  projectId: string,
+  postId: string,
+  opts: { includeHidden?: boolean } = {},
+) {
+  assertPermission(ctx, 'read')
+  await getProject(ctx, projectId)
+  return listComments(projectId, postId, { ...opts, includeInternal: true })
+}
+
+/** Use the same authoritative scope check from HTTP routes and dashboard actions. */
+export async function createAdminComment(
+  ctx: AuthContext,
+  projectId: string,
+  postId: string,
+  input: { body: string; parentCommentId?: string; isInternal?: boolean },
+) {
+  assertPermission(ctx, 'write')
+  await getProject(ctx, projectId)
+  return createComment(projectId, postId, input, { memberId: ctx.memberId })
+}
+
+export async function deleteAdminComment(
+  ctx: AuthContext,
+  projectId: string,
+  postId: string,
+  id: string,
+) {
+  assertPermission(ctx, 'write')
+  await getProject(ctx, projectId)
+  return deleteComment(projectId, postId, id)
 }

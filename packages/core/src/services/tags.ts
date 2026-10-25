@@ -1,6 +1,6 @@
 import { and, db, eq, newId, posts, postTags, tags } from '@chorala/db'
 import type { CreateTagInput } from '@chorala/types'
-import type { AuthContext } from '../context.ts'
+import { type AuthContext, assertPermission } from '../context.ts'
 import { conflict, notFound } from '../errors.ts'
 import { getProject } from './projects.ts'
 
@@ -12,14 +12,20 @@ export async function listTags(ctx: AuthContext, projectId: string) {
 /** Tags currently attached to a post. */
 export async function listPostTags(ctx: AuthContext, projectId: string, postId: string) {
   await getProject(ctx, projectId)
+  const [post] = await db
+    .select({ id: posts.id })
+    .from(posts)
+    .where(and(eq(posts.id, postId), eq(posts.projectId, projectId)))
+  if (!post) throw notFound('Post')
   return db
     .select({ id: tags.id, name: tags.name, color: tags.color })
     .from(postTags)
     .innerJoin(tags, eq(tags.id, postTags.tagId))
-    .where(eq(postTags.postId, postId))
+    .where(and(eq(postTags.postId, postId), eq(tags.projectId, projectId)))
 }
 
 export async function createTag(ctx: AuthContext, projectId: string, input: CreateTagInput) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   const [dupe] = await db
     .select({ id: tags.id })
@@ -34,6 +40,7 @@ export async function createTag(ctx: AuthContext, projectId: string, input: Crea
 }
 
 export async function deleteTag(ctx: AuthContext, projectId: string, id: string) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   const [row] = await db.select().from(tags).where(eq(tags.id, id))
   if (!row || row.projectId !== projectId) throw notFound('Tag')
@@ -94,6 +101,7 @@ export async function setPostTags(
   postId: string,
   tagIds: string[],
 ) {
+  assertPermission(ctx, 'write')
   await getProject(ctx, projectId)
   const [post] = await db
     .select({ id: posts.id, projectId: posts.projectId })

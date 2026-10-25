@@ -1,21 +1,24 @@
 import type { Metadata } from 'next'
-import { Fraunces, Hanken_Grotesk } from 'next/font/google'
+import localFont from 'next/font/local'
 import { cookies } from 'next/headers'
 import type { CSSProperties, ReactNode } from 'react'
 import { THEME_IDS } from '@/lib/themes'
 import './globals.css'
 
-const sans = Hanken_Grotesk({
-  subsets: ['latin'],
+const sans = localFont({
+  src: [{ path: './fonts/HankenGrotesk-Variable.ttf', weight: '400 700', style: 'normal' }],
   variable: '--font-hanken',
-  weight: ['400', '500', '600', '700'],
+  display: 'swap',
 })
 
-const display = Fraunces({
-  subsets: ['latin'],
+const display = localFont({
+  src: [
+    { path: './fonts/Fraunces-Variable.ttf', weight: '400 600', style: 'normal' },
+    { path: './fonts/Fraunces-Italic-Variable.ttf', weight: '400 600', style: 'italic' },
+  ],
   variable: '--font-fraunces',
-  weight: ['400', '500', '600'],
-  style: ['normal', 'italic'],
+  display: 'swap',
+  adjustFontFallback: 'Times New Roman',
 })
 
 export const metadata: Metadata = {

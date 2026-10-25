@@ -41,9 +41,9 @@ let ctx: AuthContext
 let orgId: string
 let userId: string
 
-// A 1×1 transparent PNG data URL.
+// A valid 1×1 PNG data URL.
 const PNG =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWP4////fwAJ+wP9CNHoHgAAAABJRU5ErkJggg=='
 
 async function newProject(slug: string) {
   const p = await projects.createProject(ctx, {

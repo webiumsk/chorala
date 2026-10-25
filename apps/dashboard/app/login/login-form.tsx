@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useState } from 'react'
-import { Button, Card, Input, Label } from '@/components/ui'
+import { Button, Card, Input } from '@/components/ui'
 
 export function LoginForm() {
   const router = useRouter()
@@ -16,7 +16,7 @@ export function LoginForm() {
     setBusy(true)
     setError(null)
     try {
-      // Same-origin on idea.2pu.net; haproxy routes /api/* to the API which owns Better Auth.
+      // The configured same-origin edge routes authentication to the API.
       const res = await fetch('/api/v1/auth/sign-in/email', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -39,8 +39,15 @@ export function LoginForm() {
     <Card className="p-6">
       <form onSubmit={onSubmit} className="space-y-4">
         <div>
-          <Label>Email</Label>
+          <label
+            htmlFor="login-email"
+            className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft"
+          >
+            Email
+          </label>
           <Input
+            id="login-email"
+            name="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -49,8 +56,15 @@ export function LoginForm() {
           />
         </div>
         <div>
-          <Label>Password</Label>
+          <label
+            htmlFor="login-password"
+            className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft"
+          >
+            Password
+          </label>
           <Input
+            id="login-password"
+            name="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

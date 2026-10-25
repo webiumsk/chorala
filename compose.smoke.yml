@@ -1,0 +1,45 @@
+# Disposable production-image smoke stack. Never point it at a deployed service.
+# Run together with docker-compose.yml and explicit project chorala-fork-smoke.
+# The base interpolation password below is synthetic and only for these test volumes.
+name: chorala-fork-smoke
+services:
+  postgres:
+    restart: 'no'
+  redis:
+    restart: 'no'
+  migrate:
+    env_file: !reset []
+    environment: &smoke-environment
+      CHORALA_AUTH_SECRET: synthetic_smoke_auth_secret_not_for_production_123456
+      CHORALA_PUBLIC_URL: http://127.0.0.1:18094
+      CHORALA_API_URL: http://127.0.0.1:18094
+      CHORALA_WIDGET_CDN_URL: http://127.0.0.1:18094/widget.js
+      CHORALA_DEPLOYMENT: selfhost
+      CHORALA_AI_PROVIDER: none
+      CHORALA_EMAIL_TRANSPORT: none
+      CHORALA_ALLOW_SIGNUP: 'false'
+      CHORALA_BOOTSTRAP_EMAIL: smoke-admin@example.invalid
+      CHORALA_BOOTSTRAP_PASSWORD: synthetic_smoke_bootstrap_password_123456
+      CHORALA_BOOTSTRAP_NAME: Smoke Administrator
+      NEXT_TELEMETRY_DISABLED: '1'
+      TURBO_TELEMETRY_DISABLED: '1'
+  api:
+    restart: 'no'
+    env_file: !reset []
+    environment: *smoke-environment
+  dashboard:
+    restart: 'no'
+    env_file: !reset []
+    environment:
+      <<: *smoke-environment
+      CHORALA_ADMIN_HOSTS: smoke-alias.example.invalid
+  worker:
+    restart: 'no'
+    env_file: !reset []
+    environment: *smoke-environment
+  caddy:
+    restart: 'no'
+    environment:
+      CHORALA_DOMAIN: ':80'
+    ports: !override
+      - '127.0.0.1:18094:80'

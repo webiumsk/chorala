@@ -379,13 +379,9 @@ describe('moderation + audit (Phase 17)', () => {
     expect(body.posts.some((p) => p.id === flagged.id)).toBe(false)
   })
 
-  test('audit log records admin actions and is readable', async () => {
+  test('a project API key cannot read the organization-wide audit log', async () => {
     const res = await app.request('/api/v1/org/audit-log', { headers: auth })
-    expect(res.status).toBe(200)
-    const entries = (await res.json()) as { action: string }[]
-    expect(Array.isArray(entries)).toBe(true)
-    // the score-field / status changes above were recorded
-    expect(entries.some((e) => e.action.startsWith('post.'))).toBe(true)
+    expect(res.status).toBe(403)
   })
 })
 

@@ -1,0 +1,35 @@
+{
+	admin off
+	auto_https off
+	servers {
+		trusted_proxies static {$CHORALA_TRUSTED_PROXY_CIDRS}
+		trusted_proxies_strict
+		client_ip_headers X-Forwarded-For
+	}
+}
+
+:8080 {
+	# A literal route preserves this guard before the catch-all reverse proxy.
+	route {
+		@wrongHost not host feedback.satflux.io
+		respond @wrongHost "Unknown host" 421
+		encode gzip
+		@api path /api/* /widget.js /widget.js.map
+		handle @api {
+			reverse_proxy api:8787 {
+				header_up Host feedback.satflux.io
+				header_up X-Forwarded-Host feedback.satflux.io
+				header_up X-Forwarded-Proto https
+				header_up X-Forwarded-For {client_ip}
+			}
+		}
+		handle {
+			reverse_proxy dashboard:3015 {
+				header_up Host feedback.satflux.io
+				header_up X-Forwarded-Host feedback.satflux.io
+				header_up X-Forwarded-Proto https
+				header_up X-Forwarded-For {client_ip}
+			}
+		}
+	}
+}

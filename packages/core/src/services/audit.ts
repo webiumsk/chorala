@@ -37,10 +37,11 @@ export type AuditListOpts = { action?: string; limit?: number; before?: string }
 
 /**
  * Read the org's audit trail, newest first, resolving the actor to a name/email when it's a
- * known user. Sensitive governance data — restricted to org admins (or API-key automation).
+ * known user. Sensitive governance data - restricted to org admins. Project-scoped API keys
+ * cannot expose other projects' audit events.
  */
 export async function listAuditLog(ctx: AuthContext, opts: AuditListOpts = {}) {
-  if (!(ctx.kind === 'apikey' || canManageOrg(ctx))) {
+  if (!canManageOrg(ctx)) {
     throw forbidden('Only org admins can read the audit log')
   }
   const filters = [eq(auditLog.orgId, ctx.orgId)]

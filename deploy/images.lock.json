@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "platform": "linux/amd64",
+  "runtime_source": {
+    "repository": "https://github.com/webiumsk/chorala",
+    "revision": "9b010f092cf14ac421922d4924a1af4a1a3c524c",
+    "lockfile_sha256": "d9004b86383dcea939c2b5e0c9b5a5ccb0c665749d12da0719b966da2a9306bf",
+    "node_version": "v24.22.1"
+  },
+  "images": {
+    "api": {
+      "variable": "CHORALA_API_IMAGE",
+      "reference": "sha256:f7cb9badacd59afe6d9a7d910e1b3045419bd2aa820c738240ca4feedfc6c419",
+      "verify_runtime_source": true
+    },
+    "dashboard": {
+      "variable": "CHORALA_DASHBOARD_IMAGE",
+      "reference": "sha256:cce32e6d7bb2982ff845d87d5a33d541363a663a1bfa7d5c7c8d30ec7a5522d9",
+      "verify_runtime_source": true
+    },
+    "worker": {
+      "variable": "CHORALA_WORKER_IMAGE",
+      "reference": "sha256:5543dffee3733df923008c25de60c3a586c3330583dfacfa9508fc0e9b9f3d76",
+      "verify_runtime_source": true
+    },
+    "postgres": {
+      "variable": "CHORALA_POSTGRES_IMAGE",
+      "reference": "sha256:f1447071e6c8449dcf4056aa0994c81d3566ce5ee232de36b04dc25696a116dd",
+      "verify_runtime_source": false
+    },
+    "redis": {
+      "variable": "CHORALA_REDIS_IMAGE",
+      "reference": "sha256:13105d2858ded45aedf7b24f0870e6a4e7ce4964924bffce68e562ca72149f1e",
+      "verify_runtime_source": false
+    },
+    "gateway": {
+      "variable": "CHORALA_GATEWAY_IMAGE",
+      "reference": "sha256:3067cc4e02c091399edbd5d65f85a3ff4d511574aecadb47f280c3761e68852e",
+      "tested_version": "Caddy 2.11.7",
+      "verify_runtime_source": false
+    }
+  }
+}

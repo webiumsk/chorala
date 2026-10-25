@@ -5,7 +5,8 @@ Expose your Chorala feedback to AI clients (Claude Desktop, Claude Code, Cursor)
 search semantically, and draft changelogs from inside your assistant.
 
 This package is **MIT** and talks to the Chorala HTTP API over the network with an
-admin API key (`hk_…`) — it imports none of the server code.
+project-scoped API key (`hk_…`) — it imports none of the server code. Prefer a
+read-only key unless status changes are required.
 
 ## Tools
 
@@ -60,8 +61,14 @@ claude mcp add chorala \
 ## Transports
 
 - **stdio** (default) — for local Claude Desktop / Claude Code / Cursor.
-- **streamable HTTP** — set `CHORALA_MCP_TRANSPORT=http` (and optionally `CHORALA_MCP_PORT`,
-  default `8788`) for remote clients.
+- **streamable HTTP** — set `CHORALA_MCP_TRANSPORT=http` and a separate random
+  `CHORALA_MCP_HTTP_TOKEN` of 32–256 characters. Every request requires that token
+  as a bearer credential. The listener defaults to `127.0.0.1:8788`; remote binding
+  requires an explicit opt-in and protected TLS/network access. Browser origins
+  are rejected. Request and tool-input budgets apply before expensive validation.
+
+See [MCP transport security](../../docs/MCP_SECURITY.md) for exact limits, binding
+options and runtime tests. The backend API key is never the HTTP access token.
 
 ## Run locally
 

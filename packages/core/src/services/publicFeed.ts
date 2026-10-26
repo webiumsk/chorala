@@ -24,6 +24,7 @@ import {
   votes,
 } from '@chorala/db'
 import type { CreateCommentInput, CreatePostInput, PostSort } from '@chorala/types'
+import { newestChangelogFirst } from '../changelog-order.ts'
 import { badRequest, notFound } from '../errors.ts'
 import {
   enqueueGithubAutoCreate,
@@ -324,11 +325,12 @@ export async function getRoadmap(
 }
 
 export async function getPublicChangelog(projectId: string) {
-  return db
+  const entries = await db
     .select()
     .from(changelogEntries)
     .where(and(eq(changelogEntries.projectId, projectId), eq(changelogEntries.status, 'published')))
     .orderBy(desc(changelogEntries.publishedAt))
+  return newestChangelogFirst(entries)
 }
 
 export async function subscribeChangelog(projectId: string, email: string, endUserId?: string) {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'preact/hooks'
 import type { Api } from './api.ts'
+import { ChangelogMarkdown } from './changelog-markdown.tsx'
 import { emitEngaged } from './engage.ts'
 import type { Translator } from './i18n.ts'
 import { Screenshot } from './Screenshot.tsx'
@@ -485,7 +486,7 @@ function ChangelogView({ t, entries }: { t: Translator; entries: ChangelogEntry[
               ))}
             </div>
           )}
-          <p style="color:var(--chorala-muted);font-size:13px">{e.body}</p>
+          <ChangelogMarkdown body={e.body} />
         </div>
       ))}
     </div>

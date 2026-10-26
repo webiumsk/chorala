@@ -107,8 +107,26 @@ button { font-family: inherit; cursor: pointer; }
 .chorala-cl { padding: 12px 0; border-bottom: 1px solid var(--chorala-border); }
 .chorala-cl h3 { margin: 0 0 4px; font-size: 15px; }
 .chorala-cl .date { font-size: 12px; color: var(--chorala-muted); }
-.chorala-labels { display: flex; gap: 4px; margin: 4px 0; }
+.chorala-labels { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
 .chorala-label { font-size: 11px; background: var(--chorala-surface); padding: 1px 8px; border-radius: 9999px; color: var(--chorala-muted); }
+
+.chorala-cl > h3, .chorala-label { overflow-wrap: anywhere; }
+.chorala-markdown { min-width: 0; color: var(--chorala-muted); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.chorala-markdown > :first-child { margin-top: 8px; }
+.chorala-markdown > :last-child { margin-bottom: 0; }
+.chorala-markdown p, .chorala-markdown ul, .chorala-markdown ol, .chorala-markdown blockquote { margin: 10px 0; }
+.chorala-markdown h3, .chorala-markdown h4, .chorala-markdown h5, .chorala-markdown h6 { color: var(--chorala-fg); font-size: 14px; margin: 14px 0 6px; }
+.chorala-markdown ul, .chorala-markdown ol { padding-left: 22px; }
+.chorala-markdown li + li { margin-top: 5px; }
+.chorala-markdown a { color: var(--chorala-fg); text-decoration: underline; text-underline-offset: 2px; }
+.chorala-markdown a:hover { text-decoration-thickness: 2px; }
+.chorala-markdown a:focus-visible, .chorala-markdown pre:focus-visible { outline: 2px solid var(--chorala-fg); outline-offset: 3px; }
+.chorala-markdown strong { color: var(--chorala-fg); }
+.chorala-markdown code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .9em; background: var(--chorala-surface); border-radius: 4px; padding: 1px 4px; }
+.chorala-markdown pre { max-width: 100%; overflow-x: auto; background: var(--chorala-surface); border-radius: 6px; padding: 10px; margin: 10px 0; }
+.chorala-markdown pre code { padding: 0; white-space: pre; overflow-wrap: normal; }
+.chorala-markdown blockquote { border-left: 3px solid var(--chorala-border); padding-left: 10px; }
+.chorala-markdown hr { border: 0; border-top: 1px solid var(--chorala-border); margin: 12px 0; }
 
 .chorala-empty { text-align: center; color: var(--chorala-muted); padding: 32px 12px; }
 .chorala-error { color: #ef4444; font-size: 13px; padding: 8px 0; }

@@ -30,6 +30,7 @@ import {
 import type { CreateInsightInput, CreateSurveyInput, SegmentDefinition } from '@chorala/types'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { parseChangelogForm } from './changelog-form'
 import { requireAuthContext } from './session'
 
 // --- Portal (public, no admin auth) ---
@@ -276,30 +277,21 @@ export async function createBoard(formData: FormData) {
 // --- Changelog ---
 export async function saveChangelog(formData: FormData) {
   const ctx = await requireWriteContext()
-  const projectId = String(formData.get('projectId'))
-  const id = formData.get('id') ? String(formData.get('id')) : null
-  const status = formData.get('publish') ? 'published' : 'draft'
-  const segmentId = String(formData.get('segmentId') ?? '') || null
-  const payload = {
-    title: String(formData.get('title')),
-    body: String(formData.get('body') ?? ''),
-    status: status as 'draft' | 'published',
-    labels: String(formData.get('labels') ?? '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean),
-    linkedPostIds: [],
-    segmentId,
+  const parsed = parseChangelogForm(formData)
+  if (parsed.id !== null) {
+    await changelog.updateChangelog(ctx, parsed.projectId, parsed.id, parsed.payload)
+  } else {
+    await changelog.createChangelog(ctx, parsed.projectId, parsed.payload)
   }
-  if (id) await changelog.updateChangelog(ctx, projectId, id, payload)
-  else await changelog.createChangelog(ctx, projectId, payload)
-  revalidatePath(`${adminPath(projectId)}/changelog`)
+  revalidatePath(`${adminPath(parsed.projectId)}/changelog`)
+  revalidatePath(`/portal/${parsed.projectId}/changelog`)
 }
 
 export async function deleteChangelog(projectId: string, id: string) {
   const ctx = await requireWriteContext()
   await changelog.deleteChangelog(ctx, projectId, id)
   revalidatePath(`${adminPath(projectId)}/changelog`)
+  revalidatePath(`/portal/${projectId}/changelog`)
 }
 
 // --- Settings ---

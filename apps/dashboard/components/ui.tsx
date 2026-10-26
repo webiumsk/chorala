@@ -4,6 +4,7 @@ import type {
   ButtonHTMLAttributes,
   HTMLAttributes,
   InputHTMLAttributes,
+  LabelHTMLAttributes,
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react'
@@ -70,7 +71,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn('surface', className)} {...props} />
 }
 
-export function Label({ className, ...props }: HTMLAttributes<HTMLLabelElement>) {
+export function Label({ className, ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
   return (
     <label
       className={cn(

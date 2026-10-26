@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 import {
   type AnyPgColumn,
   boolean,
+  date,
   doublePrecision,
   index,
   integer,
@@ -458,6 +459,8 @@ export const changelogEntries = pgTable(
     title: text('title').notNull(),
     body: text('body').default('').notNull(),
     status: text('status').$type<'draft' | 'published'>().default('draft').notNull(),
+    // Calendar date for display/order; publication still records actual delivery time.
+    displayDate: date('display_date', { mode: 'string' }),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     labels: text('labels').array().default([]).notNull(),
     linkedPostIds: text('linked_post_ids').array().default([]).notNull(),

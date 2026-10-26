@@ -1,3 +1,4 @@
+import { changelogEntry, createChangelogInput, updateChangelogInput } from '@chorala/types'
 import { describe, expect, test } from 'vitest'
 import { newestChangelogFirst } from '../src/changelog-order.ts'
 
@@ -6,6 +7,7 @@ const entry = (
   id: string,
   overrides: Partial<{
     title: string
+    displayDate: string | null
     labels: string[]
     publishedAt: Date | null
     createdAt: Date
@@ -118,5 +120,118 @@ describe('newest-first changelog order', () => {
     expect(input).toEqual([old, latest])
     expect(result[0]).toBe(latest)
     expect(old.publishedAt).toBe(createdAt)
+  })
+
+  test('uses persisted display dates after arbitrary title, body and category edits', () => {
+    const changed = [
+      entry('cl_august', {
+        title: '2026-08-16',
+        displayDate: '2026-08-16',
+        publishedAt: createdAt,
+        labels: ['fixed'],
+      }),
+      entry('cl_october', {
+        title: 'A completely rewritten title',
+        displayDate: '2026-10-25',
+        publishedAt: createdAt,
+        labels: [],
+      }),
+      entry('cl_september', {
+        title: 'Not a date',
+        displayDate: '2026-09-01',
+        publishedAt: createdAt,
+      }),
+    ]
+    expect(ids(changed)).toEqual(['cl_october', 'cl_september', 'cl_august'])
+  })
+
+  test('a persisted date takes precedence over both title and publication date', () => {
+    expect(
+      ids([
+        entry('cl_old', {
+          title: 'Satflux development history - 2099-12-31',
+          displayDate: '2026-08-16',
+          publishedAt: new Date('2099-12-31T00:00:00Z'),
+        }),
+        entry('cl_new', { displayDate: '2026-10-25', publishedAt: createdAt }),
+      ]),
+    ).toEqual(['cl_new', 'cl_old'])
+  })
+
+  test('explicitly null dates use timestamps instead of resurrecting a legacy title date', () => {
+    expect(
+      ids([
+        entry('cl_cleared', {
+          title: 'Satflux development history - 2099-12-31',
+          displayDate: null,
+          publishedAt: new Date('2026-08-16T00:00:00Z'),
+        }),
+        entry('cl_new', { displayDate: '2026-10-25' }),
+      ]),
+    ).toEqual(['cl_new', 'cl_cleared'])
+  })
+
+  test('invalid stored calendar dates fall back without rolling into another day', () => {
+    expect(
+      ids([
+        entry('cl_invalid', { displayDate: '2026-02-30' }),
+        entry('cl_valid', { displayDate: '2026-02-28' }),
+      ]),
+    ).toEqual(['cl_invalid', 'cl_valid']) // Invalid date falls back to the later creation time.
+    expect(ids([entry('cl_leap', { displayDate: '2024-02-29' })])).toEqual(['cl_leap'])
+  })
+})
+
+describe('changelog calendar date contracts', () => {
+  test.each(['2026-08-16', '2024-02-29', '0001-01-01', '9999-12-31'])(
+    'accepts a real calendar date in API and DTO schemas: %s',
+    (displayDate) => {
+      expect(createChangelogInput.parse({ title: 'Date', body: '', displayDate }).displayDate).toBe(
+        displayDate,
+      )
+      expect(updateChangelogInput.parse({ displayDate }).displayDate).toBe(displayDate)
+      expect(changelogEntry.shape.displayDate.parse(displayDate)).toBe(displayDate)
+    },
+  )
+
+  test.each([
+    '2026-02-29',
+    '2026-02-30',
+    '2026-04-31',
+    '2026-13-01',
+    '2026-00-01',
+    '2026-01-00',
+    '0000-01-01',
+    '2026-8-16',
+    ' 2026-08-16',
+    '2026-08-16T00:00:00Z',
+    '',
+  ])('rejects malformed or rolled-over API/DTO dates: %s', (displayDate) => {
+    expect(createChangelogInput.safeParse({ title: 'Date', body: '', displayDate }).success).toBe(
+      false,
+    )
+    expect(updateChangelogInput.safeParse({ displayDate }).success).toBe(false)
+    expect(changelogEntry.shape.displayDate.safeParse(displayDate).success).toBe(false)
+  })
+
+  test('omission preserves PATCH intent while null explicitly clears a date', () => {
+    expect(updateChangelogInput.parse({ title: 'Renamed' })).not.toHaveProperty('displayDate')
+    expect(updateChangelogInput.parse({ displayDate: null })).toHaveProperty('displayDate', null)
+    expect(changelogEntry.shape.displayDate.parse(undefined)).toBeUndefined()
+    expect(changelogEntry.shape.displayDate.parse(null)).toBeNull()
+  })
+
+  test('date-only PATCH parsing never adds publication or relationship defaults', () => {
+    expect(updateChangelogInput.parse({ displayDate: '2026-08-16' })).toEqual({
+      displayDate: '2026-08-16',
+    })
+    expect(updateChangelogInput.parse({ displayDate: null })).toEqual({ displayDate: null })
+    expect(updateChangelogInput.parse({ title: 'Renamed' })).toEqual({ title: 'Renamed' })
+    expect(updateChangelogInput.parse({})).toEqual({})
+    expect(createChangelogInput.parse({ title: 'New entry', body: '' })).toMatchObject({
+      status: 'draft',
+      labels: [],
+      linkedPostIds: [],
+    })
   })
 })

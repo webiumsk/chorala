@@ -13,6 +13,7 @@ type Entry = {
   status: 'draft' | 'published'
   segmentId: string | null
   recipientCount: number
+  displayDate?: string | null
 }
 
 type Segment = { id: string; name: string; matchCount: number }
@@ -35,6 +36,7 @@ export function ChangelogManager({
   const [body, setBody] = useState('')
   const [labels, setLabels] = useState('')
   const [segmentId, setSegmentId] = useState('')
+  const [displayDate, setDisplayDate] = useState('')
   const [preview, setPreview] = useState(false)
   const [filter, setFilter] = useState('all')
   const [pending, setPending] = useState(false)
@@ -46,7 +48,8 @@ export function ChangelogManager({
     title !== (selected?.title ?? '') ||
     body !== (selected?.body ?? '') ||
     labels !== (selected?.labels.join(', ') ?? '') ||
-    segmentId !== (selected?.segmentId ?? '')
+    segmentId !== (selected?.segmentId ?? '') ||
+    displayDate !== (selected?.displayDate ?? '')
 
   function fillEditor(entry: Entry | null) {
     setSelected(entry)
@@ -54,6 +57,7 @@ export function ChangelogManager({
     setBody(entry?.body ?? '')
     setLabels(entry?.labels.join(', ') ?? '')
     setSegmentId(entry?.segmentId ?? '')
+    setDisplayDate(entry?.displayDate ?? '')
     setPreview(false)
     setError(null)
   }
@@ -91,6 +95,7 @@ export function ChangelogManager({
             .map((label) => label.trim())
             .filter(Boolean),
           segmentId: segmentId || null,
+          displayDate: displayDate || null,
           status: nextStatus,
         })
       } else {
@@ -171,6 +176,21 @@ export function ChangelogManager({
                     value={title}
                     onChange={(event) => setTitle(event.target.value)}
                   />
+                </div>
+                <div>
+                  <Label htmlFor={`${fieldId}-date`}>Changelog date</Label>
+                  <Input
+                    id={`${fieldId}-date`}
+                    name="displayDate"
+                    type="date"
+                    value={displayDate}
+                    onChange={(event) => setDisplayDate(event.target.value)}
+                    aria-describedby={`${fieldId}-date-help`}
+                  />
+                  <p id={`${fieldId}-date-help`} className="mt-1 text-xs text-ink-faint">
+                    Sets the displayed date and newest-first order. Leave empty to use the
+                    publication date. Editing the title or body keeps this date.
+                  </p>
                 </div>
                 <div>
                   <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">

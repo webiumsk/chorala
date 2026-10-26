@@ -32,6 +32,7 @@ export function buildStyles(settings: WidgetSettings): string {
   font-size: 14px;
   line-height: 1.45;
 }
+.chorala-app { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
 button { font-family: inherit; cursor: pointer; }
 
 /* Floating launcher */
@@ -48,26 +49,27 @@ button { font-family: inherit; cursor: pointer; }
 .chorala-overlay {
   position: fixed; inset: 0; z-index: 2147483001;
   background: rgba(15,23,42,.35);
-  display: flex; align-items: stretch; justify-content: ${left ? 'flex-start' : 'flex-end'};
+  overflow: hidden; display: flex; align-items: stretch; justify-content: ${left ? 'flex-start' : 'flex-end'};
 }
 .chorala-panel {
-  background: var(--chorala-bg); width: 420px; max-width: 100vw; height: 100%;
+  background: var(--chorala-bg); width: 420px; max-width: 100vw; height: 100vh; height: 100dvh; min-height: 0; overflow: hidden;
   display: flex; flex-direction: column; box-shadow: 0 0 40px rgba(0,0,0,.25);
   animation: chorala-slide .18s ease-out;
 }
-.chorala-inline .chorala-panel { height: 600px; max-height: 80vh; width: 100%; border: 1px solid var(--chorala-border); border-radius: 12px; }
+.chorala-inline .chorala-panel { height: 600px; max-height: 80vh; max-height: 80dvh; width: 100%; border: 1px solid var(--chorala-border); border-radius: 12px; }
 @keyframes chorala-slide { from { transform: translateX(${left ? '-' : ''}24px); opacity: .4 } to { transform: none; opacity: 1 } }
 
-.chorala-header { padding: 14px 16px; border-bottom: 1px solid var(--chorala-border); display: flex; align-items: center; gap: 8px; }
+.chorala-header { flex-shrink: 0; padding: 14px 16px; border-bottom: 1px solid var(--chorala-border); display: flex; align-items: center; gap: 8px; }
 .chorala-header h1 { font-size: 16px; margin: 0; font-weight: 700; flex: 1; }
 .chorala-x { background: none; border: none; color: var(--chorala-muted); font-size: 20px; line-height: 1; padding: 4px; }
 
-.chorala-tabs { display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--chorala-border); }
+.chorala-tabs { flex-shrink: 0; display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--chorala-border); }
 .chorala-tab { background: none; border: none; padding: 6px 12px; border-radius: 8px; color: var(--chorala-muted); font-weight: 600; font-size: 13px; }
 .chorala-tab.active { background: var(--chorala-surface); color: var(--chorala-fg); }
 
-.chorala-body { flex: 1; overflow-y: auto; padding: 12px; }
-.chorala-footer { padding: 8px 12px; border-top: 1px solid var(--chorala-border); display: flex; align-items: center; justify-content: space-between; }
+.chorala-body { flex: 1; min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px; -webkit-overflow-scrolling: touch; }
+.chorala-body:focus-visible { outline: 2px solid var(--chorala-fg); outline-offset: -2px; }
+.chorala-footer { flex-shrink: 0; padding: 8px 12px; border-top: 1px solid var(--chorala-border); display: flex; align-items: center; justify-content: space-between; }
 .chorala-credit { font-size: 11px; color: var(--chorala-muted); text-decoration: none; }
 
 /* Buttons */
@@ -106,7 +108,7 @@ button { font-family: inherit; cursor: pointer; }
 /* Changelog */
 .chorala-cl { padding: 12px 0; border-bottom: 1px solid var(--chorala-border); }
 .chorala-cl h3 { margin: 0 0 4px; font-size: 15px; }
-.chorala-cl .date { font-size: 12px; color: var(--chorala-muted); }
+.chorala-cl .date { display: block; font-size: 12px; color: var(--chorala-muted); }
 .chorala-labels { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
 .chorala-label { font-size: 11px; background: var(--chorala-surface); padding: 1px 8px; border-radius: 9999px; color: var(--chorala-muted); }
 

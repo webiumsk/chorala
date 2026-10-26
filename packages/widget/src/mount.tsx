@@ -67,7 +67,12 @@ export function mountWidget(opts: MountOpts): Instance {
       />
     )
 
-    if (opts.mode === 'inline') return <div class="chorala-root">{panel}</div>
+    if (opts.mode === 'inline')
+      return (
+        <div class="chorala-root chorala-inline">
+          <div class="chorala-panel">{panel}</div>
+        </div>
+      )
 
     return (
       <div class="chorala-root">

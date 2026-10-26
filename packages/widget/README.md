@@ -14,6 +14,18 @@ This is a small Markdown subset, not a full CommonMark renderer.
 Rendering is implemented inside this MIT package without importing AGPL dashboard
 or server code. Existing stored Markdown and publication dates need no migration.
 
+## Dates and scrolling
+
+The optional `displayDate` API field is a calendar day (`YYYY-MM-DD`), formatted
+without a browser-timezone day shift. When absent or null, the widget displays the
+publication timestamp as before. Ordering comes from the server. Editing a title
+does not change a stored display date.
+
+Floating/manual panels fit the viewport; inline panels have a bounded height.
+The labelled, keyboard-focusable content region scrolls independently while the
+header, tabs and footer remain visible. Wheel, keyboard and touch scrolling use
+the browser's native scrolling behavior.
+
 ```sh
 pnpm --filter @chorala/widget test
 pnpm --filter @chorala/widget typecheck

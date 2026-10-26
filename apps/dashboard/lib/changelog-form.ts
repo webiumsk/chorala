@@ -45,7 +45,14 @@ export function parseChangelogForm(formData: FormData) {
   if (segmentId !== null && !SEGMENT_ID.test(segmentId)) {
     throw new Error('Invalid changelog audience')
   }
-  const fields = { title, body, labels, segmentId }
+  const displayDate = field(formData, 'displayDate', false)
+  const fields = {
+    title,
+    body,
+    labels,
+    segmentId,
+    ...(displayDate === null ? {} : { displayDate: displayDate || null }),
+  }
   const status = publish === '1' ? 'published' : draft === '1' ? 'draft' : undefined
 
   if (target.id !== null) {

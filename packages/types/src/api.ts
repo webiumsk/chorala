@@ -15,6 +15,7 @@ import {
 } from './common.ts'
 import {
   attachment,
+  changelogDisplayDate,
   comment,
   company,
   endUser,
@@ -209,6 +210,8 @@ export type CreateTagInput = z.infer<typeof createTagInput>
 export const createChangelogInput = z.object({
   title: z.string().min(1),
   body: z.string(),
+  // A calendar day, independent of publication/delivery time. Omission preserves it on PATCH.
+  displayDate: changelogDisplayDate.nullable().optional(),
   status: changelogStatus.default('draft'),
   labels: z.array(z.string()).default([]),
   linkedPostIds: z.array(z.string()).default([]),
@@ -216,7 +219,13 @@ export const createChangelogInput = z.object({
   segmentId: z.string().nullable().optional(),
 })
 export type CreateChangelogInput = z.infer<typeof createChangelogInput>
-export const updateChangelogInput = createChangelogInput.partial()
+// Defaults inside an optional Zod field still run. A PATCH must preserve every
+// omitted field rather than resetting publication state or stored relationships.
+export const updateChangelogInput = createChangelogInput.partial().extend({
+  status: changelogStatus.optional(),
+  labels: z.array(z.string()).optional(),
+  linkedPostIds: z.array(z.string()).optional(),
+})
 export type UpdateChangelogInput = z.infer<typeof updateChangelogInput>
 
 // --- Segments (Phase 13) ---

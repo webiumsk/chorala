@@ -49,6 +49,7 @@ export async function createChangelog(
       projectId,
       title: input.title,
       body: input.body,
+      displayDate: input.displayDate ?? null,
       status: input.status,
       labels: input.labels,
       linkedPostIds: input.linkedPostIds,
@@ -88,6 +89,7 @@ export async function updateChangelog(
       .set({
         title: input.title,
         body: input.body,
+        displayDate: input.displayDate,
         status: input.status,
         labels: input.labels,
         linkedPostIds: input.linkedPostIds,

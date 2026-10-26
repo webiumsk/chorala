@@ -106,6 +106,27 @@ the original operator files. The active override path is recorded in `runtime.js
 and in the running API's normal Compose labels. The updater refuses unexpected
 changes to that file list rather than dropping an operator overlay.
 
+## Changelog calendar dates (migration 0012)
+
+This additive migration stores a nullable `display_date`, used for both displayed
+dates and newest-first ordering. The administrator's **Changelog date** input
+controls it; renaming or editing an entry leaves its date unchanged. Clearing it
+uses the ordinary publication/creation timestamp fallback. The actual publication
+timestamp and notification history remain separate.
+
+The migration recovers the 78 reviewed Satflux merged-PR history dates by matching
+the original project's deterministic import IDs. It preserves edited titles,
+bodies, labels, publication status/timestamps, links, audiences and recipient counts.
+These source dates record PR integration, not verified deployment dates. Unrelated
+entries are not backfilled based on their titles or text.
+
+Deploy the migrated server before the matching vendored Satflux widget. The new
+widget accepts older server responses with no `displayDate`, but those responses
+cannot supply recovered historical dates. Do not rerun the historical import to
+repair existing entries. The older offline importer does not populate this new
+field for future imports; any future import needs an explicitly reviewed date-aware
+tool or dates set through the editor.
+
 ## Failure and recovery
 
 Before migration, failures attempt to resume only services that were running before

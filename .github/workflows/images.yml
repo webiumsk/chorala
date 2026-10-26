@@ -1,0 +1,54 @@
+name: Publish deployment images
+
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployment-images-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  images:
+    if: >-
+      github.repository == 'webiumsk/chorala' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, dashboard, worker]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - name: Build and publish the exact green main revision
+        env:
+          REVISION: ${{ github.event.workflow_run.head_sha }}
+          SERVICE: ${{ matrix.service }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          [[ "$REVISION" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$(git rev-parse HEAD)" == "$REVISION" ]]
+          case "$SERVICE" in api|dashboard|worker) ;; *) exit 1 ;; esac
+          image="ghcr.io/webiumsk/chorala-${SERVICE}:sha-${REVISION}"
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$REGISTRY_USER" --password-stdin
+          docker build --pull --file "docker/Dockerfile.${SERVICE}" \
+            --label "org.opencontainers.image.revision=${REVISION}" \
+            --label 'org.opencontainers.image.source=https://github.com/webiumsk/chorala' \
+            --tag "$image" .
+          docker push "$image"

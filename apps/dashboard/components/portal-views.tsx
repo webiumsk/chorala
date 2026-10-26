@@ -1,5 +1,6 @@
 import { publicFeed } from '@chorala/core'
 import { notFound } from 'next/navigation'
+import { ChangelogMarkdown } from '@/components/changelog-markdown'
 import { PortalBoard, StatusPill, TagChip } from '@/components/portal-board'
 import { PortalComment, PortalVote, SubscribeForm } from '@/components/portal-client'
 
@@ -160,7 +161,9 @@ export async function ChangelogView({ projectId }: Props) {
             )}
           </div>
           <h2 className="font-display text-xl tracking-[-0.01em]">{e.title}</h2>
-          <p className="mt-1 whitespace-pre-wrap text-ink-soft">{e.body}</p>
+          <div className="mt-1 text-ink-soft">
+            <ChangelogMarkdown body={e.body} />
+          </div>
         </article>
       ))}
     </div>

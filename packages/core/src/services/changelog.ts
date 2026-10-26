@@ -1,5 +1,6 @@
 import { and, changelogEntries, db, desc, eq, newId } from '@chorala/db'
 import type { CreateChangelogInput, UpdateChangelogInput } from '@chorala/types'
+import { newestChangelogFirst } from '../changelog-order.ts'
 import { type AuthContext, assertPermission } from '../context.ts'
 import { notFound } from '../errors.ts'
 import { enqueueNotification, enqueueWebhookEvent } from '../queues.ts'
@@ -15,11 +16,12 @@ export async function listChangelog(
   await getProject(ctx, projectId)
   const filters = [eq(changelogEntries.projectId, projectId)]
   if (opts.publishedOnly) filters.push(eq(changelogEntries.status, 'published'))
-  return db
+  const entries = await db
     .select()
     .from(changelogEntries)
     .where(and(...filters))
     .orderBy(desc(changelogEntries.publishedAt), desc(changelogEntries.createdAt))
+  return newestChangelogFirst(entries)
 }
 
 async function getEntry(ctx: AuthContext, projectId: string, id: string) {

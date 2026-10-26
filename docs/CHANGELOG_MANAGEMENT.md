@@ -13,6 +13,12 @@ HTTP(S) links without credentials are active. **New entry** or **Cancel** asks b
 discarding unsaved work. Deletion requires confirmation. Errors keep the edited
 values available for retry. The entries filter separates drafts and published items.
 
+Admin, public portal and widget feeds show the newest entries first. Standard
+entries use publication time, falling back to creation time for drafts. Imported
+PR history with the standard dated history title uses that title's original calendar
+date, so a batch imported or published together still reads newest first, including
+after category labels are edited. Ties are stable; stored publication dates are not changed.
+
 Organization owners and admins may manage entries; members and moderators have a
 read-only view. Server actions independently enforce session, role and project
 authorization. The dashboard's validated update payload deliberately omits unchanged

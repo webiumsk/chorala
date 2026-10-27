@@ -13,7 +13,12 @@ import { updateChangelogInput } from '@chorala/types'
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { AuthContext } from '../src/context.ts'
 import { enqueueNotification, enqueueWebhookEvent } from '../src/queues.ts'
-import { createChangelog, getChangelog, updateChangelog } from '../src/services/changelog.ts'
+import {
+  createChangelog,
+  getChangelog,
+  listChangelog,
+  updateChangelog,
+} from '../src/services/changelog.ts'
 
 vi.mock('../src/queues.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/queues.ts')>()),
@@ -104,6 +109,76 @@ describe('editing and publishing existing changelogs', () => {
     expect(updated.status).toBe('published')
     expect(updated.publishedAt).toEqual(originalDate)
     expect(updated.linkedPostIds).toEqual(['post_SyntheticRetainedLink'])
+    expect(enqueueNotification).toHaveBeenCalledTimes(1)
+    expect(enqueueWebhookEvent).toHaveBeenCalledTimes(1)
+  })
+
+  test('republishing keeps the first publication time while preserving delivery transitions', async () => {
+    const id = await draft()
+    expect((await getChangelog(ctx, projectId, id)).publishedAt).toBeNull()
+    const firstPublished = await updateChangelog(ctx, projectId, id, { status: 'published' })
+    expect(firstPublished?.publishedAt).toBeInstanceOf(Date)
+    const unpublished = await updateChangelog(ctx, projectId, id, { status: 'draft' })
+    expect(unpublished?.publishedAt).toEqual(firstPublished?.publishedAt)
+    expect(enqueueNotification).toHaveBeenCalledTimes(1)
+    expect(enqueueWebhookEvent).toHaveBeenCalledTimes(1)
+    // Model a later edit without depending on a wall-clock sleep.
+    const oldUpdate = new Date('2020-01-01T00:00:00Z')
+    await db
+      .update(changelogEntries)
+      .set({ updatedAt: oldUpdate })
+      .where(eq(changelogEntries.id, id))
+    const republished = await updateChangelog(ctx, projectId, id, { status: 'published' })
+    expect(republished?.publishedAt).toEqual(firstPublished?.publishedAt)
+    expect(republished?.updatedAt.getTime()).toBeGreaterThan(oldUpdate.getTime())
+    expect(enqueueNotification).toHaveBeenCalledTimes(2)
+    expect(enqueueWebhookEvent).toHaveBeenCalledTimes(2)
+    const corrected = await updateChangelog(ctx, projectId, id, { title: 'Published correction' })
+    expect(corrected?.publishedAt).toEqual(firstPublished?.publishedAt)
+    expect(enqueueNotification).toHaveBeenCalledTimes(2)
+    expect(enqueueWebhookEvent).toHaveBeenCalledTimes(2)
+  })
+
+  test('republishing a backdated entry preserves timestamp fallback and feed order', async () => {
+    const olderId = await draft()
+    const newerId = await draft()
+    const historicalDate = new Date('2026-01-10T12:30:00Z')
+    await db
+      .update(changelogEntries)
+      .set({ status: 'published', publishedAt: historicalDate })
+      .where(eq(changelogEntries.id, olderId))
+    await db
+      .update(changelogEntries)
+      .set({ status: 'published', publishedAt: new Date('2026-08-16T12:30:00Z') })
+      .where(eq(changelogEntries.id, newerId))
+    const relatedIds = new Set([olderId, newerId])
+    const order = async () =>
+      (await listChangelog(ctx, projectId, { publishedOnly: true }))
+        .filter((entry) => relatedIds.has(entry.id))
+        .map((entry) => entry.id)
+    expect(await order()).toEqual([newerId, olderId])
+    await updateChangelog(ctx, projectId, olderId, { status: 'draft' })
+    const republished = await updateChangelog(ctx, projectId, olderId, { status: 'published' })
+    expect(republished?.displayDate).toBeNull()
+    expect(republished?.publishedAt).toEqual(historicalDate)
+    expect(await order()).toEqual([newerId, olderId])
+    expect(enqueueNotification).toHaveBeenCalledTimes(1)
+    expect(enqueueWebhookEvent).toHaveBeenCalledTimes(1)
+  })
+
+  test('an existing publication timestamp survives publishing an imported draft', async () => {
+    const id = await draft()
+    const historicalDate = new Date('2026-01-10T12:30:00Z')
+    await db
+      .update(changelogEntries)
+      .set({ publishedAt: historicalDate, displayDate: '2026-01-10' })
+      .where(eq(changelogEntries.id, id))
+    const published = await updateChangelog(ctx, projectId, id, { status: 'published' })
+    expect(published?.displayDate).toBe('2026-01-10')
+    expect(published?.publishedAt).toEqual(historicalDate)
+    const cleared = await updateChangelog(ctx, projectId, id, { displayDate: null })
+    expect(cleared?.displayDate).toBeNull()
+    expect(cleared?.publishedAt).toEqual(historicalDate)
     expect(enqueueNotification).toHaveBeenCalledTimes(1)
     expect(enqueueWebhookEvent).toHaveBeenCalledTimes(1)
   })

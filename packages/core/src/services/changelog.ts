@@ -94,7 +94,8 @@ export async function updateChangelog(
         labels: input.labels,
         linkedPostIds: input.linkedPostIds,
         segmentId: input.segmentId === undefined ? undefined : input.segmentId,
-        publishedAt: becomingPublished ? new Date() : undefined,
+        // Keep the first publication time across later draft/publish cycles.
+        publishedAt: becomingPublished && existing.publishedAt === null ? new Date() : undefined,
       })
       .where(and(eq(changelogEntries.id, id), eq(changelogEntries.projectId, projectId)))
       .returning()

@@ -450,3 +450,20 @@ CI fails on full-audit high/critical records, including build tools. Residual mo
 the exact inactive entry points are tracked in `docs/DEPENDENCY_SECURITY.md`, rather
 than suppressed or represented as a clean audit. Reassess when dependencies,
 development-server configuration or application imports change.
+
+## Changelog republication dates (2026-10-27)
+
+- [changelog] Retain an existing `publishedAt` when a previously published entry
+  returns from draft to published. Fill it only on first publication, inside the
+  existing project-scoped row lock. Editing and republishing must not silently
+  move an entry's release chronology. `displayDate` remains the explicit calendar
+  override; clearing it intentionally uses the retained timestamp fallback.
+- [changelog] Preserve existing publication-transition notification/webhook rules
+  and the non-atomic database/queue boundary. A later explicit republication can
+  still deliver again; date-only edits do not. Do not rewrite existing timestamps,
+  reimport history, change content or republish production data to apply this fix.
+- [changelog] The earlier display-date migration and matching widget remain
+  required for renamed imported history. This follow-up adds no migration,
+  dependency or client artifact change. Prepare the owned provider PR with
+  independent regression/security evidence; merge and deployment remain owner
+  decisions.

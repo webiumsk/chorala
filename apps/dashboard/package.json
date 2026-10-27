@@ -18,7 +18,7 @@
     "@chorala/core": "workspace:*",
     "@chorala/db": "workspace:*",
     "@chorala/types": "workspace:*",
-    "better-auth": "1.6.33",
+    "better-auth": "1.7.7",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "next": "15.5.28",

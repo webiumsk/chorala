@@ -467,3 +467,16 @@ development-server configuration or application imports change.
   dependency or client artifact change. Prepare the owned provider PR with
   independent regression/security evidence; merge and deployment remain owner
   decisions.
+
+## Better Auth audit remediation (2026-10-27)
+
+- [security] Fresh CI exposes new critical/high advisories against the existing
+  Better Auth 1.6.33 dependency. Qualify a synchronized API/dashboard 1.7.7 update
+  within the same major instead of weakening or suppressing the full audit gate.
+  The relevant opt-in plugins are absent from our configuration; the upgrade still
+  removes the vulnerable package versions before preparing the PR for merge.
+- [security] Preserve current auth policy, signing secrets, user/session records
+  and schema. The pinned direct-upgrade guide needs no core-column or password/
+  session migration for enabled features. Prove existing-password and old-session
+  compatibility on a new disposable database; do not infer this from semver alone.
+  Retain schema validation and fail-closed handling of ambiguous duplicate accounts.

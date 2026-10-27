@@ -69,5 +69,6 @@ export type ChangelogEntry = {
   title: string
   body: string
   publishedAt: string | null
+  displayDate?: string | null
   labels: string[]
 }

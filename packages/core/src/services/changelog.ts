@@ -49,6 +49,7 @@ export async function createChangelog(
       projectId,
       title: input.title,
       body: input.body,
+      displayDate: input.displayDate ?? null,
       status: input.status,
       labels: input.labels,
       linkedPostIds: input.linkedPostIds,
@@ -88,11 +89,13 @@ export async function updateChangelog(
       .set({
         title: input.title,
         body: input.body,
+        displayDate: input.displayDate,
         status: input.status,
         labels: input.labels,
         linkedPostIds: input.linkedPostIds,
         segmentId: input.segmentId === undefined ? undefined : input.segmentId,
-        publishedAt: becomingPublished ? new Date() : undefined,
+        // Keep the first publication time across later draft/publish cycles.
+        publishedAt: becomingPublished && existing.publishedAt === null ? new Date() : undefined,
       })
       .where(and(eq(changelogEntries.id, id), eq(changelogEntries.projectId, projectId)))
       .returning()

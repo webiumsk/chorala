@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { ChangelogMarkdown } from '@/components/changelog-markdown'
 import { PortalBoard, StatusPill, TagChip } from '@/components/portal-board'
 import { PortalComment, PortalVote, SubscribeForm } from '@/components/portal-client'
+import { changelogDate } from '@/lib/changelog-date'
 
 type Props = { projectId: string; publicKey: string; locale?: string; basePath?: string }
 
@@ -146,26 +147,29 @@ export async function ChangelogView({ projectId }: Props) {
         <SubscribeForm projectId={projectId} />
       </div>
       {entries.length === 0 && <p className="text-ink-faint">No changelog entries yet.</p>}
-      {entries.map((e) => (
-        <article key={e.id} className="border-b border-line pb-5">
-          <div className="mb-1 flex items-center gap-2">
-            {e.labels.map((l) => (
-              <span key={l} className="rounded-full bg-ink/5 px-2 py-0.5 text-xs text-ink-soft">
-                {l}
-              </span>
-            ))}
-            {e.publishedAt && (
-              <span className="text-xs text-ink-faint">
-                {new Date(e.publishedAt).toLocaleDateString()}
-              </span>
-            )}
-          </div>
-          <h2 className="font-display text-xl tracking-[-0.01em]">{e.title}</h2>
-          <div className="mt-1 text-ink-soft">
-            <ChangelogMarkdown body={e.body} />
-          </div>
-        </article>
-      ))}
+      {entries.map((e) => {
+        const date = changelogDate(e)
+        return (
+          <article key={e.id} className="border-b border-line pb-5">
+            <div className="mb-1 flex items-center gap-2">
+              {e.labels.map((l) => (
+                <span key={l} className="rounded-full bg-ink/5 px-2 py-0.5 text-xs text-ink-soft">
+                  {l}
+                </span>
+              ))}
+              {date && (
+                <time dateTime={date.dateTime} className="text-xs text-ink-faint">
+                  {date.label}
+                </time>
+              )}
+            </div>
+            <h2 className="font-display text-xl tracking-[-0.01em]">{e.title}</h2>
+            <div className="mt-1 text-ink-soft">
+              <ChangelogMarkdown body={e.body} />
+            </div>
+          </article>
+        )
+      })}
     </div>
   )
 }

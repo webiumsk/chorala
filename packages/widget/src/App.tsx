@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'preact/hooks'
 import type { Api } from './api.ts'
+import { changelogDate } from './changelog-date.ts'
 import { ChangelogMarkdown } from './changelog-markdown.tsx'
 import { emitEngaged } from './engage.ts'
 import type { Translator } from './i18n.ts'
@@ -78,7 +79,7 @@ export function App(props: Props) {
   const tabs: View[] = ['board', 'roadmap', 'changelog']
 
   return (
-    <div class={`chorala-root ${inline ? 'chorala-inline' : ''}`}>
+    <div class="chorala-root chorala-app">
       <div class="chorala-header">
         <h1>{t('feedback')}</h1>
         {!inline && (
@@ -105,7 +106,8 @@ export function App(props: Props) {
         ))}
       </div>
 
-      <div class="chorala-body">
+      {/* biome-ignore lint/a11y/noNoninteractiveTabindex: The named scroll region must support keyboard scrolling. */}
+      <section class="chorala-body" aria-label={t(view)} tabIndex={0}>
         {error && <div class="chorala-error">{error}</div>}
         {loading ? (
           <div class="chorala-empty">{t('loading')}</div>
@@ -142,9 +144,9 @@ export function App(props: Props) {
         ) : view === 'roadmap' ? (
           <RoadmapView t={t} roadmap={roadmap} onOpen={setDetailId} />
         ) : (
-          <ChangelogView t={t} entries={changelog} />
+          <ChangelogView t={t} locale={locale} entries={changelog} />
         )}
-      </div>
+      </section>
 
       <div class="chorala-footer">
         <a class="chorala-credit" href="https://chorala.com" target="_blank" rel="noreferrer">
@@ -469,26 +471,41 @@ function RoadmapView({
   )
 }
 
-function ChangelogView({ t, entries }: { t: Translator; entries: ChangelogEntry[] }) {
+function ChangelogView({
+  t,
+  locale,
+  entries,
+}: {
+  t: Translator
+  locale: string
+  entries: ChangelogEntry[]
+}) {
   if (entries.length === 0) return <div class="chorala-empty">{t('nothingHere')}</div>
   return (
     <div>
-      {entries.map((e) => (
-        <div key={e.id} class="chorala-cl">
-          <h3>{e.title}</h3>
-          {e.publishedAt && <div class="date">{new Date(e.publishedAt).toLocaleDateString()}</div>}
-          {e.labels.length > 0 && (
-            <div class="chorala-labels">
-              {e.labels.map((l) => (
-                <span key={l} class="chorala-label">
-                  {l}
-                </span>
-              ))}
-            </div>
-          )}
-          <ChangelogMarkdown body={e.body} />
-        </div>
-      ))}
+      {entries.map((e) => {
+        const date = changelogDate(e, locale)
+        return (
+          <div key={e.id} class="chorala-cl">
+            <h3>{e.title}</h3>
+            {date && (
+              <time class="date" dateTime={date.dateTime}>
+                {date.label}
+              </time>
+            )}
+            {e.labels.length > 0 && (
+              <div class="chorala-labels">
+                {e.labels.map((l) => (
+                  <span key={l} class="chorala-label">
+                    {l}
+                  </span>
+                ))}
+              </div>
+            )}
+            <ChangelogMarkdown body={e.body} />
+          </div>
+        )
+      })}
     </div>
   )
 }

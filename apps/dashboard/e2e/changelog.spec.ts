@@ -27,12 +27,14 @@ test('an existing draft publishes with its ID and stays published when edited', 
       body: string
       status: string
       publishedAt: string | null
+      displayDate: string | null
     }>
   }
   let entryId: string | undefined
   try {
     await page.goto(`/admin/${projectId}/changelog`)
     await page.getByLabel('Title', { exact: true }).fill(title)
+    await page.getByLabel('Changelog date', { exact: true }).fill('2026-08-16')
     await page.getByLabel('Body (Markdown)', { exact: true }).fill(originalBody)
     await page.getByLabel('Labels (comma-separated)', { exact: true }).fill('e2e, improved')
     await page.getByRole('button', { name: 'Save draft', exact: true }).click()
@@ -40,6 +42,7 @@ test('an existing draft publishes with its ID and stays published when edited', 
     const draft = (await entries()).find((entry) => entry.title === title)
     expect(draft?.status).toBe('draft')
     expect(draft?.publishedAt).toBeNull()
+    expect(draft?.displayDate).toBe('2026-08-16')
     expect(draft?.id).toBeTruthy()
     entryId = draft?.id
 
@@ -51,23 +54,28 @@ test('an existing draft publishes with its ID and stays published when edited', 
     const published = (await entries()).find((entry) => entry.id === entryId)
     expect(published?.status).toBe('published')
     expect(published?.publishedAt).toBeTruthy()
+    expect(published?.displayDate).toBe('2026-08-16')
 
     const changedBody = '## Reviewed update\n\n- Updated without changing publication status.'
     await page.getByLabel('Body (Markdown)', { exact: true }).fill(changedBody)
+    const editedTitle = `${title} renamed`
+    await page.getByLabel('Title', { exact: true }).fill(editedTitle)
     await page.getByRole('button', { name: 'Save changes', exact: true }).click()
     await expect(page.getByText('Published entry saved.', { exact: true })).toBeVisible()
     const edited = (await entries()).find((entry) => entry.id === entryId)
     expect(edited?.status).toBe('published')
     expect(edited?.publishedAt).toBe(published?.publishedAt)
+    expect(edited?.displayDate).toBe('2026-08-16')
     expect(edited?.body.replace(/\r\n/g, '\n')).toBe(changedBody)
     await page.goto(`/portal/${projectId}/changelog`)
-    await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: editedTitle, exact: true })).toBeVisible()
     const article = page.locator('article').filter({
-      has: page.getByRole('heading', { name: title, exact: true }),
+      has: page.getByRole('heading', { name: editedTitle, exact: true }),
     })
     await expect(
       article.getByRole('heading', { name: 'Reviewed update', exact: true }),
     ).toBeVisible()
+    await expect(article.locator('time')).toHaveAttribute('datetime', '2026-08-16')
   } finally {
     if (entryId) {
       const response = await page.request.delete(`${endpoint}/${entryId}`, {

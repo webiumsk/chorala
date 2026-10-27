@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { ChangelogMarkdown } from '../components/changelog-markdown.tsx'
+import { changelogDate } from '../lib/changelog-date.ts'
 
 const render = (body: string) =>
   renderToStaticMarkup(React.createElement(ChangelogMarkdown, { body }))
@@ -45,4 +46,25 @@ test('ordered lists, quotes, line endings and unterminated code are safe', () =>
   assert.match(html, /<blockquote\b/)
   assert.match(html, /&lt;script&gt;/)
   assert.doesNotMatch(html, /<script\b/)
+})
+
+test('historical display dates remain calendar days independently of publication and timezone', () => {
+  const previous = process.env.TZ
+  try {
+    process.env.TZ = 'America/Los_Angeles'
+    assert.deepEqual(
+      changelogDate({ displayDate: '2026-08-16', publishedAt: '2026-10-26T08:00:00Z' }, 'en-US'),
+      { dateTime: '2026-08-16', label: '8/16/2026' },
+    )
+    assert.equal(changelogDate({ displayDate: null, publishedAt: null }), null)
+    assert.equal(
+      changelogDate({ publishedAt: '2026-10-26T08:00:00Z' }, 'en-US')?.dateTime,
+      '2026-10-26T08:00:00.000Z',
+    )
+    assert.equal(changelogDate({ displayDate: '2026-02-30', publishedAt: null }), null)
+    assert.equal(changelogDate({ publishedAt: 'invalid' }), null)
+  } finally {
+    if (previous === undefined) delete process.env.TZ
+    else process.env.TZ = previous
+  }
 })

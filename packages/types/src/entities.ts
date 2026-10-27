@@ -202,6 +202,10 @@ export const tag = z
   .extend(timestamps.shape)
 
 // --- Communication ---
+export const changelogDisplayDate = z.iso
+  .date()
+  .refine((value) => !value.startsWith('0000-'), 'The calendar year must be positive')
+
 export const changelogEntry = z
   .object({
     id: prefixedId('cl'),
@@ -209,6 +213,7 @@ export const changelogEntry = z
     title: z.string(),
     body: z.string(),
     status: changelogStatus,
+    displayDate: changelogDisplayDate.nullable().optional(),
     publishedAt: isoDate.nullable(),
     labels: z.array(z.string()),
     linkedPostIds: z.array(prefixedId('post')),

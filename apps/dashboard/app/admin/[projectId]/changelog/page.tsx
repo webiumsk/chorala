@@ -26,6 +26,7 @@ export default async function ChangelogPage({
         status: entry.status,
         segmentId: entry.segmentId,
         recipientCount: entry.recipientCount,
+        displayDate: entry.displayDate,
       }))}
       segments={segments.map((segment) => ({
         id: segment.id,

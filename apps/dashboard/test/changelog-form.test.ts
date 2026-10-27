@@ -32,6 +32,28 @@ test('new entries use the shared default draft schema and initialize linked post
   assert.deepEqual(parsed.payload.linkedPostIds, [])
 })
 
+test('changelog dates survive ordinary saves and can be explicitly cleared', () => {
+  const data = form()
+  data.set('displayDate', '2026-08-16')
+  assert.equal(parseChangelogForm(data).payload.displayDate, '2026-08-16')
+  assert.equal(Object.hasOwn(parseChangelogForm(data).payload, 'status'), false)
+  data.set('displayDate', '')
+  assert.equal(parseChangelogForm(data).payload.displayDate, null)
+  data.delete('displayDate')
+  assert.equal(Object.hasOwn(parseChangelogForm(data).payload, 'displayDate'), false)
+  const fresh = form(false)
+  fresh.set('displayDate', '2026-08-24')
+  assert.equal(parseChangelogForm(fresh).payload.displayDate, '2026-08-24')
+})
+
+test('invalid calendar dates cannot be saved through the editor', () => {
+  for (const value of ['2026-02-30', '2026-2-1', 'not-a-date']) {
+    const data = form()
+    data.set('displayDate', value)
+    assert.throws(() => parseChangelogForm(data), /content/)
+  }
+})
+
 test('publishing or returning to draft requires one explicit publication intent', () => {
   for (const [name, expected] of [
     ['publish', 'published'],
@@ -106,6 +128,7 @@ test('files and duplicate scalar fields cannot be coerced into a save', () => {
     'body',
     'labels',
     'segmentId',
+    'displayDate',
     'publish',
     'draft',
   ]) {

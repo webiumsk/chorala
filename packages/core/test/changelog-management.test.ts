@@ -9,10 +9,16 @@ import {
   projects,
   segments,
 } from '@chorala/db'
+import { updateChangelogInput } from '@chorala/types'
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { AuthContext } from '../src/context.ts'
 import { enqueueNotification, enqueueWebhookEvent } from '../src/queues.ts'
-import { getChangelog, updateChangelog } from '../src/services/changelog.ts'
+import {
+  createChangelog,
+  getChangelog,
+  listChangelog,
+  updateChangelog,
+} from '../src/services/changelog.ts'
 
 vi.mock('../src/queues.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/queues.ts')>()),
@@ -107,6 +113,76 @@ describe('editing and publishing existing changelogs', () => {
     expect(enqueueWebhookEvent).toHaveBeenCalledTimes(1)
   })
 
+  test('republishing keeps the first publication time while preserving delivery transitions', async () => {
+    const id = await draft()
+    expect((await getChangelog(ctx, projectId, id)).publishedAt).toBeNull()
+    const firstPublished = await updateChangelog(ctx, projectId, id, { status: 'published' })
+    expect(firstPublished?.publishedAt).toBeInstanceOf(Date)
+    const unpublished = await updateChangelog(ctx, projectId, id, { status: 'draft' })
+    expect(unpublished?.publishedAt).toEqual(firstPublished?.publishedAt)
+    expect(enqueueNotification).toHaveBeenCalledTimes(1)
+    expect(enqueueWebhookEvent).toHaveBeenCalledTimes(1)
+    // Model a later edit without depending on a wall-clock sleep.
+    const oldUpdate = new Date('2020-01-01T00:00:00Z')
+    await db
+      .update(changelogEntries)
+      .set({ updatedAt: oldUpdate })
+      .where(eq(changelogEntries.id, id))
+    const republished = await updateChangelog(ctx, projectId, id, { status: 'published' })
+    expect(republished?.publishedAt).toEqual(firstPublished?.publishedAt)
+    expect(republished?.updatedAt.getTime()).toBeGreaterThan(oldUpdate.getTime())
+    expect(enqueueNotification).toHaveBeenCalledTimes(2)
+    expect(enqueueWebhookEvent).toHaveBeenCalledTimes(2)
+    const corrected = await updateChangelog(ctx, projectId, id, { title: 'Published correction' })
+    expect(corrected?.publishedAt).toEqual(firstPublished?.publishedAt)
+    expect(enqueueNotification).toHaveBeenCalledTimes(2)
+    expect(enqueueWebhookEvent).toHaveBeenCalledTimes(2)
+  })
+
+  test('republishing a backdated entry preserves timestamp fallback and feed order', async () => {
+    const olderId = await draft()
+    const newerId = await draft()
+    const historicalDate = new Date('2026-01-10T12:30:00Z')
+    await db
+      .update(changelogEntries)
+      .set({ status: 'published', publishedAt: historicalDate })
+      .where(eq(changelogEntries.id, olderId))
+    await db
+      .update(changelogEntries)
+      .set({ status: 'published', publishedAt: new Date('2026-08-16T12:30:00Z') })
+      .where(eq(changelogEntries.id, newerId))
+    const relatedIds = new Set([olderId, newerId])
+    const order = async () =>
+      (await listChangelog(ctx, projectId, { publishedOnly: true }))
+        .filter((entry) => relatedIds.has(entry.id))
+        .map((entry) => entry.id)
+    expect(await order()).toEqual([newerId, olderId])
+    await updateChangelog(ctx, projectId, olderId, { status: 'draft' })
+    const republished = await updateChangelog(ctx, projectId, olderId, { status: 'published' })
+    expect(republished?.displayDate).toBeNull()
+    expect(republished?.publishedAt).toEqual(historicalDate)
+    expect(await order()).toEqual([newerId, olderId])
+    expect(enqueueNotification).toHaveBeenCalledTimes(1)
+    expect(enqueueWebhookEvent).toHaveBeenCalledTimes(1)
+  })
+
+  test('an existing publication timestamp survives publishing an imported draft', async () => {
+    const id = await draft()
+    const historicalDate = new Date('2026-01-10T12:30:00Z')
+    await db
+      .update(changelogEntries)
+      .set({ publishedAt: historicalDate, displayDate: '2026-01-10' })
+      .where(eq(changelogEntries.id, id))
+    const published = await updateChangelog(ctx, projectId, id, { status: 'published' })
+    expect(published?.displayDate).toBe('2026-01-10')
+    expect(published?.publishedAt).toEqual(historicalDate)
+    const cleared = await updateChangelog(ctx, projectId, id, { displayDate: null })
+    expect(cleared?.displayDate).toBeNull()
+    expect(cleared?.publishedAt).toEqual(historicalDate)
+    expect(enqueueNotification).toHaveBeenCalledTimes(1)
+    expect(enqueueWebhookEvent).toHaveBeenCalledTimes(1)
+  })
+
   test('read-only staff and foreign project or organization targets cannot publish', async () => {
     const id = await draft()
     await expect(
@@ -129,5 +205,101 @@ describe('editing and publishing existing changelogs', () => {
     expect(updated?.segmentId).toBeNull()
     expect(updated?.linkedPostIds).toEqual(['post_SyntheticRetainedLink'])
     expect(updated?.status).toBe('draft')
+  })
+
+  test('display dates survive edits and publication without replacing publication time', async () => {
+    const id = await draft()
+    await updateChangelog(ctx, projectId, id, { displayDate: '2026-08-16' })
+    expect(enqueueNotification).not.toHaveBeenCalled()
+    expect(enqueueWebhookEvent).not.toHaveBeenCalled()
+    await updateChangelog(ctx, projectId, id, {
+      title: '2026-08-16',
+      body: 'Owner-rewritten content',
+      labels: ['fixed'],
+    })
+    const beforePublication = Date.now()
+    const published = await updateChangelog(ctx, projectId, id, { status: 'published' })
+    expect(published?.displayDate).toBe('2026-08-16')
+    expect(published?.publishedAt).toBeInstanceOf(Date)
+    expect(published?.publishedAt?.getTime()).toBeGreaterThanOrEqual(beforePublication)
+    const updated = await updateChangelog(ctx, projectId, id, {
+      title: 'Arbitrary title after publication',
+      displayDate: '2026-08-21',
+    })
+    expect(updated?.displayDate).toBe('2026-08-21')
+    expect(updated?.publishedAt).toEqual(published?.publishedAt)
+    expect(updated?.linkedPostIds).toEqual(['post_SyntheticRetainedLink'])
+    expect(updated?.segmentId).toBe(segmentId)
+    expect(updated?.body).toBe('Owner-rewritten content')
+    expect(enqueueNotification).toHaveBeenCalledTimes(1)
+    expect(enqueueWebhookEvent).toHaveBeenCalledTimes(1)
+  })
+
+  test('cleared dates stay null on later ordinary edits even with a legacy title', async () => {
+    const id = await draft()
+    await updateChangelog(ctx, projectId, id, {
+      title: 'Satflux development history - 2026-08-16',
+      displayDate: '2026-08-16',
+    })
+    expect(
+      (await updateChangelog(ctx, projectId, id, { displayDate: null }))?.displayDate,
+    ).toBeNull()
+    const updated = await updateChangelog(ctx, projectId, id, { body: 'A subsequent edit' })
+    expect(updated?.displayDate).toBeNull()
+    expect(updated?.publishedAt).toBeNull()
+    expect(enqueueNotification).not.toHaveBeenCalled()
+    expect(enqueueWebhookEvent).not.toHaveBeenCalled()
+  })
+
+  test('a new draft can carry a calendar date without publishing or delivery', async () => {
+    const created = await createChangelog(ctx, projectId, {
+      title: 'Historical release',
+      body: 'Reviewed history',
+      displayDate: '2026-08-16',
+      status: 'draft',
+      labels: [],
+      linkedPostIds: [],
+    })
+    expect(created?.displayDate).toBe('2026-08-16')
+    expect(created?.publishedAt).toBeNull()
+    expect(enqueueNotification).not.toHaveBeenCalled()
+    expect(enqueueWebhookEvent).not.toHaveBeenCalled()
+  })
+
+  test('calendar date changes retain role and project isolation', async () => {
+    const id = await draft()
+    await expect(
+      updateChangelog({ ...ctx, role: 'member' }, projectId, id, { displayDate: '2026-08-16' }),
+    ).rejects.toThrow('Missing write permission')
+    await expect(
+      updateChangelog(ctx, otherProjectId, id, { displayDate: '2026-08-16' }),
+    ).rejects.toThrow('Changelog entry')
+    await expect(
+      updateChangelog({ ...ctx, orgId: 'org_Unrelated' }, projectId, id, {
+        displayDate: '2026-08-16',
+      }),
+    ).rejects.toThrow('Project')
+    expect((await getChangelog(ctx, projectId, id)).displayDate).toBeNull()
+    expect(enqueueNotification).not.toHaveBeenCalled()
+    expect(enqueueWebhookEvent).not.toHaveBeenCalled()
+  })
+
+  test('parsed date-only PATCH preserves published status and all omitted relationships', async () => {
+    const id = await draft()
+    const published = await updateChangelog(ctx, projectId, id, { status: 'published' })
+    vi.mocked(enqueueNotification).mockClear()
+    vi.mocked(enqueueWebhookEvent).mockClear()
+    const payload = updateChangelogInput.parse({ displayDate: '2026-08-16' })
+    const updated = await updateChangelog(ctx, projectId, id, payload)
+    expect(updated?.displayDate).toBe('2026-08-16')
+    expect(updated?.status).toBe('published')
+    expect(updated?.publishedAt).toEqual(published?.publishedAt)
+    expect(updated?.title).toBe('Imported draft')
+    expect(updated?.body).toBe('Original historical Markdown')
+    expect(updated?.labels).toEqual(['history'])
+    expect(updated?.linkedPostIds).toEqual(['post_SyntheticRetainedLink'])
+    expect(updated?.segmentId).toBe(segmentId)
+    expect(enqueueNotification).not.toHaveBeenCalled()
+    expect(enqueueWebhookEvent).not.toHaveBeenCalled()
   })
 })
